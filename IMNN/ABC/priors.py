@@ -7,6 +7,8 @@ TODO
 ____
 This is a early update to make the ABC module work with TF2, this should be
 properly ported at some point soon.
+
+Particularly we will update distributions to tensorflow probability.
 """
 
 

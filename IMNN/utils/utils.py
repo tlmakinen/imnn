@@ -175,3 +175,17 @@ for derivatives")
                     return False  # Other type (?)
             except NameError:
                 return False
+
+    def check_gridsize(self, gridsize, n_params):
+        if type(gridsize) == int:
+            gridsize = tuple([gridsize for i in range(n_params)])
+        elif (type(gridsize) == tuple) or (type(gridsize) == list):
+            if type(gridsize) == list:
+                gridsize = tuple(gridsize)
+            if not (len(gridsize) == n_params):
+                print("`gridsize` must be an int or a list or tuple with a length of {}".format(n_params))
+                sys.exit()
+        else:
+            print("`gridsize` must be an int or a list or tuple with a length of {}".format(n_params))
+            sys.exit()
+        return gridsize

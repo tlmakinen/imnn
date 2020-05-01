@@ -34,8 +34,10 @@ class IMNN():
         32 bit or 64 TensorFlow tensor integers
     save : bool
         whether to save the model
+    directory : str
+        directory for loading and saving the model
     filename : str
-        directory to save the model
+        filename for loading and saving the model
     validate : bool
         whether to validate during training
     n_s : int
@@ -48,6 +50,8 @@ class IMNN():
         number of summaries to compress data to
     model : TF model - keras or other
         neural network to do the compression defined using TF or keras
+    variables : tuple of TF tensor float
+        the trainable variables of the model
     optimiser : TF optimiser - keras or other
         optimisation operation to do weight updates, defined using TF or keras
     θ_fid : TF tensor float (n_params,)
@@ -78,6 +82,8 @@ class IMNN():
         dataset to grab large derivative data for validating IMNN
     F : TF tensor float (n_params, n_params)
         Fisher information matrix
+    Finv : TF tensor float (n_params, n_params)
+        inverse Fisher information matrix
     C : TF tensor float (n_summaries, n_summaries)
         covariance of summaries
     Cinv : TF tensor float (n_summaries, n_summaries)
@@ -97,12 +103,13 @@ class IMNN():
     history : dict
         history object for saving training statistics.
     """
-    def __init__(self, n_s, n_d, n_params, n_summaries, model, optimiser,
-                 θ_fid, δθ, input_shape, fiducial_loader, derivative_loader,
-                 dtype=tf.float32, itype=tf.int32, save=False, verbose=True,
-                 filename=None, at_once=None, validation_fiducial_loader=None,
-                 validation_derivative_loader=None, map_fn=None,
-                 check_shape=True):
+    def __init__(self, n_s, n_d, n_params, n_summaries, 
+                 θ_fid, δθ, input_shape, fiducial_loader, 
+                 derivative_loader, model=None, optimiser=tf.keras.optimizers.Adam(),
+                 dtype=tf.float32, itype=tf.int32, save=False, load=False, weights=None, 
+                 verbose=True, directory=None, filename=None, at_once=None, 
+                 validation_fiducial_loader=None, validation_derivative_loader=None, 
+                 map_fn=None, check_shape=True):
         """Initialises attributes and calculates useful constants
 
         Parameters
@@ -146,8 +153,14 @@ class IMNN():
             tensorflow interger size
         save : bool
             whether to save the model
+        load : bool
+            whether to load the model on initialisation
+        weights : str
+            filename for the weights to be loaded
         filename : str
-            name for saving the model
+            filename for loading and saving the model
+        directory : str
+            directory for loading and saving the model
         verbose : bool
             whether to use verbose outputs in error checking module
         check_shape : bool
@@ -170,15 +183,16 @@ class IMNN():
         self.u = utils.utils(verbose=verbose)
         check_shape = self.u.type_checking(check_shape, True, "check_shape")
         self.init_attributes(n_s, n_d, n_params, n_summaries, dtype, itype,
-                             save, filename, verbose)
+                             save, filename, directory, verbose)
         self.set_tensors(θ_fid, δθ)
         self.set_data(input_shape, fiducial_loader, derivative_loader,
                       validation_fiducial_loader, validation_derivative_loader,
                       at_once, map_fn, check_shape)
-        self.set_model(model, optimiser)
+        load = self.u.type_checking(load, True, "load")
+        self.set_model(model, optimiser, load=load, weights=weights)
 
     def init_attributes(self, n_s, n_d, n_params, n_summaries,
-                        dtype, itype, save, filename, verbose):
+                        dtype, itype, save, filename, directory, verbose):
         """Initialises all attributes and sets necessary constants
 
         All attributes are set to None before they are loaded when
@@ -203,7 +217,9 @@ class IMNN():
         save : bool
             whether to save the model
         filename : str
-            name for saving the model
+            filename for loading and saving the model
+        directory : str
+            directory for loading and saving the model
         verbose : bool
             whether to use verbose outputs in error checking module
 
@@ -227,6 +243,12 @@ class IMNN():
 
         self.save = self.u.type_checking(save, True, "save")
         if self.save:
+            if directory is None:
+                self.directory = "."
+            else:
+                self.directory = self.u.type_checking(directory,
+                                                      "hello",
+                                                      "directory")
             if filename is None:
                 self.filename = "model"
             else:
@@ -244,6 +266,7 @@ class IMNN():
         self.history = self.initialise_history()
 
         self.model = None
+        self.variables = None
         self.optimiser = None
 
         self.θ_fid = None
@@ -280,7 +303,7 @@ class IMNN():
 
         Dictionary of all diagnostics which can be collected during training.
         These are:
-            det_F - determinant of Fisher information
+            det_F - determinant of Fisher inselformation
             val_det_F - determinant of Fisher information from validation
             det_C - determinant of covariance of summaries
             val_det_C - determinant of covariance of validation summaries
@@ -304,7 +327,7 @@ class IMNN():
             "r": [],
         }
 
-    def set_model(self, model, optimiser):
+    def set_model(self, model, optimiser, load=False, weights=None):
         """Loads functional neural network and optimiser as attributes
 
         Parameters
@@ -313,20 +336,41 @@ class IMNN():
             neural network to do the compression defined using TF or keras
         optimiser : TF optimiser (keras or other)
             optimisation operation to do weight updates using TF or keras
+        load : bool
+            whether to load a previous model from file
+        weights : str
+            filename for weights to be loaded if different from loaded model
 
         Calls
         _____
+        load_model(optimiser, str)
+            loads a previously saved model
         check_model(model, tuple, int)
             checks that model takes expected input shape and output n_summaries
         """
-        self.model = self.u.check_model(model,
-                                        self.input_shape,
-                                        self.n_summaries)
-        self.optimiser = optimiser
-        if self.save:
-            if self.verbose:
-                print("saving model to " + self.filename)
-            self.model.save(self.filename)
+        if load:
+            self.load_model(optimiser, weights=weights)
+            self.variables = self.model.get_weights()
+        else:    
+            self.model = self.u.check_model(model,
+                                            self.input_shape,
+                                            self.n_summaries)
+            self.variables = self.model.get_weights()
+            self.optimiser = optimiser
+            if self.save:
+                if self.verbose:
+                    print("saving model to {}".format("/".join((self.directory, self.filename))))
+                self.model.save("/".join((self.directory, self.filename)))
+                
+    def update_variables(self, variables):
+            """Updates the initial model trainable variables
+
+            Parameters
+            __________
+            variables : tuple of TF tensor floats
+                stored trainable variabels
+            """
+            self.variables = variables
 
     def load_model(self, optimiser, weights=None):
         """Reloads a saved model
@@ -338,10 +382,10 @@ class IMNN():
         weights : str
             filename for saving weights
         """
-        self.model = tf.keras.models.load_model(self.filename)
+        self.model = tf.keras.models.load_model("/".join((self.directory, self.filename)))
         self.optimiser = optimiser
         if weights is not None:
-            self.model.load_weights(self.filename + "/" + weights + ".h5")
+            self.model.load_weights("{}.h5".format("/".join((self.directory, self.filename, weights))))
 
     def set_tensors(self, θ_fid, δθ):
         """Makes TF tensors for necessary objects which can be precomputed
@@ -638,18 +682,18 @@ class IMNN():
         _______
         data : TF tensor float input_shape
             the parsed data for passing through the network
-        index : TF tensor int ()
+        seed : TF tensor int ()
             the index of the simulation being grabbed
         """
         features = {
-            "index": tf.io.FixedLenFeature([], tf.int64),
+            "seed": tf.io.FixedLenFeature([], tf.int64),
             "data": tf.io.FixedLenFeature([], tf.string)}
         parsed_example = tf.io.parse_single_example(example, features)
         data = tf.reshape(
             tf.io.decode_raw(parsed_example["data"], self.dtype),
             self.input_shape)
-        index = tf.cast(parsed_example["index"], self.itype)
-        return data, index
+        seed = tf.cast(parsed_example["seed"], self.itype)
+        return data, seed
 
     def derivative_parser(self, example):
         """Parses the data from the .tfrecord byte stream
@@ -1408,7 +1452,7 @@ class IMNN():
 
     def fit(self, n_iterations, λ=None, ϵ=None, reset=False,
             patience=None, checkpoint=None, min_iterations=None,
-            tqdm_notebook=True):
+            tqdm_notebook=True, weights="weights"):
         """Fitting routine for IMNN
 
         Can reset model if training goes awry and clear diagnostics.
@@ -1433,6 +1477,8 @@ class IMNN():
             number of initial iterations before using patience
         tqdm_notebook : bool
             whether to use a notebook style tqdm progress bar
+        weights : str
+            filename for the weights (default: "weights")
 
         Calls
         _____
@@ -1444,10 +1490,13 @@ class IMNN():
 
         """
         if reset:
-            self.initialise_history()
-            self.model.reset_states()
+            self.history = self.initialise_history()
+            self.model.set_weights(self.variables)
         if n_iterations is None:
             n_iterations = int(1e10)
+            total = float("inf")
+        else:
+            total = n_iterations
         if (self.λ is None) or (self.α is None):
             self.get_regularisation_rate(λ, ϵ)
         elif (λ is not None) and (ϵ is not None):
@@ -1460,40 +1509,35 @@ class IMNN():
                 if self.verbose:
                     self.u.save_error()
             to_checkpoint = True
-            self.model.save_weights(self.filename + "/model_weights.h5")
+            self.model.save_weights("{}.h5".format("/".join(
+                (self.directory, self.filename, weights))))
         else:
             to_checkpoint = False
         if patience is not None:
-            if not self.save:
-                self.u.save_error()
+            if self.verbose:
+                print("Using patience length of {}. Maximum number "
+                      "of training iterations is {}.".format(
+                          patience, n_iterations))
+                print("Saving current model in {}".format(
+                    "/".join((self.directory, self.filename))))
+            weights = self.model.get_weights()
+            patience_counter = 0
+            this_iteration = 0
+            calculate_patience = True
+            min_reached = False
+            if min_iterations is None:
+                min_iterations = 1
+            if self.validate:
+                patience_criterion = "val_det_F"
             else:
-                if self.verbose:
-                    print("Using patience length of " + str(patience) +
-                          ". Maximum number of training iterations is " +
-                          str(n_iterations) + ".")
-                    print("Saving current model in " + self.filename)
-                self.model.save(self.filename)
-                self.model.save_weights(self.filename + "/model_weights.h5")
-                patience_counter = 0
-                this_iteration = 0
-                calculate_patience = True
-                min_reached = False
-                if min_iterations is None:
-                    min_iterations = 1
-                if self.validate:
-                    patience_criterion = "val_det_F"
-                else:
-                    patience_criterion = "det_F"
-                if checkpoint is None:
-                    checkpoint = 1
-                    to_checkpoint = True
+                patience_criterion = "det_F"
         else:
             calculate_patience = False
 
         if self.u.isnotebook(tqdm_notebook):
-            bar = tqdm.tnrange(n_iterations, desc="Iterations")
+            bar = tqdm.tqdm_notebook(range(n_iterations), total=total, desc="Iterations")
         else:
-            bar = tqdm.trange(n_iterations, desc="Iterations")
+            bar = tqdm.tqdm(range(n_iterations), total=total, desc="Iterations")
         for iterations in bar:
             self.F, self.C, self.Cinv, self.μ, self.dμ_dθ, self.reg, self.r = \
                 self.trainer(self.F, self.C, self.Cinv, self.μ, self.dμ_dθ,
@@ -1522,39 +1566,33 @@ class IMNN():
                 postfix_dictionary["val_det_C"] = self.history["val_det_C"][-1]
                 postfix_dictionary["val_det_Cinv"] = \
                     self.history["val_det_Cinv"][-1]
-            if to_checkpoint:
-                if calculate_patience:
-                    if min_reached:
-                        if (self.history[patience_criterion][-1]
-                                <= self.history[patience_criterion][-2]):
-                            if patience_counter > patience:
-                                print("Reached " + str(patience)
-                                      + " steps without increasing "
-                                      + patience_criterion
-                                      + ". Resetting weights to iteration "
-                                      + str(this_iteration) + ".")
-                                self.model.load_weights(
-                                    self.filename + "/model_weights.h5")
-                                break
-                            else:
-                                patience_counter += 1
+            if calculate_patience:
+                if min_reached:
+                    if (self.history[patience_criterion][-1]
+                            <= this_Fisher):
+                        if patience_counter > patience:
+                            print("Reached {} steps without increasing {}. "
+                                  "Resetting weights to iteration {}.".format(
+                                      patience, patience_criterion, this_iteration))
+                            self.model.set_weights(weights)
+                            break
                         else:
-                            patience_counter = 0
-                            if iterations % checkpoint == 0:
-                                this_iteration = iterations
-                                self.model.save_weights(
-                                    self.filename + "/model_weights.h5")
+                            patience_counter += 1
                     else:
-                        if iterations > min_iterations:
-                            min_reached = True
-                        if iterations % checkpoint == 0:
-                            this_iteration = iterations
-                            self.model.save_weights(
-                                self.filename + "/model_weights.h5")
-                    postfix_dictionary["patience"] = patience_counter
-                else:
-                    if iterations % checkpoint == 0:
+                        patience_counter = 0
                         this_iteration = iterations
-                        self.model.save_weights(
-                            self.filename + "/model_weights.h5")
+                        this_Fisher = self.history[patience_criterion][-1]
+                        weights = self.model.get_weights()
+                else:
+                    if iterations > min_iterations:
+                        min_reached = True
+                    this_iteration = iterations
+                    this_Fisher = self.history[patience_criterion][-1]
+                    weights = self.model.get_weights()
+                postfix_dictionary["patience"] = patience_counter
+            if to_checkpoint:
+                if iterations % checkpoint == 0:
+                    this_iteration = iterations
+                    self.model.save_weights("{}.h5".format("/".join(
+                        (self.directory, self.filename, weights))))
             bar.set_postfix(postfix_dictionary)
