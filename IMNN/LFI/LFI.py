@@ -27,8 +27,8 @@ import warnings
 import matplotlib.cbook
 warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
-class ABC():
-    """Module containing ABC, PMC and gaussian approximation functions
+class LFI():
+    """
 
     Attributes
     __________
@@ -42,17 +42,9 @@ class ABC():
         single input lambda function of the simulator
     n_params : int
         the number of parameters in the model
-    ABC_dict : dict
-        dictionary containing the parameters, summaries, distances and
-        differences calculated during the ABC
-    PMC_dict : dict
-        dictionary containing the parameters, summaries, distances and
-        differences calculated during the PMC
-    total_draws : int
         the number of total draws from the proposal for the PMC
     """
-    def __init__(self, target_data, prior, F, get_estimate, simulator,
-                 seed, simulator_args, labels=None):
+    def __init__(self, target_data, prior, Fisher, get_estimate, simulator, labels=None):
         """Initialises the ABC class and calculates some useful values
 
         Parameters
@@ -62,16 +54,12 @@ class ABC():
             at one time.
         prior : class
             the truncated Gaussian priors to draw parameters values from
-        F : TF tensor float (n_params, n_params)
+        Fisher : TF tensor float (n_params, n_params)
             approximate Fisher information to use for ABC
         get_estimate : func
             function for obtaining estimate from neural network
         simulator : func
             single input lambda function of the simulator
-        seed : func
-            function to set seed in the simulator
-        simulator_args : dict
-            simulator arguments to be passed to the simulator
         """
         self.prior = prior
         self.n_params = self.prior.event_shape[0]
@@ -98,31 +86,29 @@ class ABC():
             else:
                 high = [np.inf for i in self.n_params]
             self.prior.high = high
-        if type(F) == type(tf.constant(0)):
-            self.F = F.numpy()
+        if Fisher is not None:
+            if type(Fisher) == type(tf.constant(0)):
+                self.F = Fisher.numpy()
+            else:
+                self.F = Fisher
+            self.Finv = np.linalg.inv(self.F)
         else:
-            self.F = F
-        self.Finv = np.linalg.inv(self.F)
-        estimate = get_estimate(target_data)
-        if type(estimate) == type(tf.constant(0)):
-            self.estimate = estimate.numpy()
-            self.get_estimate = lambda x : get_estimate(x).numpy()
+            self.F = None
+            self.Finv = None
+        self.data = target_data
+        if get_estimate is not None:
+            estimate = get_estimate(self.data)
+            if type(estimate) == type(tf.constant(0)):
+                self.estimate = estimate.numpy()
+                self.get_estimate = lambda x : get_estimate(x).numpy()
+            else:
+                self.estimate = estimate
+                self.get_estimate = get_estimate
         else:
-            self.estimate = estimate
-            self.get_estimate = get_estimate
+            self.estimate = None
+            self.get_estimate = None
         self.labels = labels
-        self.simulator = lambda x: simulator(x, seed, simulator_args)
-        self.ABC_dict = {
-            "parameters": np.array([]).reshape((0, self.n_params)),
-            "differences": np.array([]).reshape((0, self.n_params)),
-            "estimate": np.array([]).reshape((0, self.n_params)),
-            "distances": np.array([])}
-        self.PMC_dict = {
-            "parameters": np.array([]).reshape((0, self.n_params)),
-            "estimate": np.array([]).reshape((0, self.n_params)),
-            "differences": np.array([]).reshape((0, self.n_params)),
-            "distances": np.array([])}
-        self.total_draws = 0
+        self.simulator = simulator
         
     def plot_Fisher(self, ax=None, figsize=(10, 10), save=None):
         if ax is None:
@@ -218,212 +204,211 @@ class ABC():
                     ax[j_, i_].contour(this_grid_i, this_grid_j, this_distribution.T, colors=colours[datum], levels=levels)
         return ax
 
-    class ABC:
-        def __init__(self):
-            print("Hello")
+class ApproximateBayesianComputation(LFI):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.parameters = np.array([]).reshape((0, self.n_params))
+        self.differences = np.array([]).reshape((0, self.n_params))
+        self.estimates = np.array([]).reshape((0, self.n_params))
+        self.distances = np.array([])
             
-        def __call__(self, draws, at_once=True, save_sims=None, return_dict=False,
-            PMC=False):
-            """Approximate Bayesian computation
+    def __call__(self, draws, at_once=True, save_sims=None, PMC=False):
+        return self.ABC(draws, at_once, save_sims=None, PMC=False)
+        
+    def ABC(self, draws, at_once=True, save_sims=None, PMC=False):
+        """Approximate Bayesian computation
 
-            Here we draw some parameter values from the prior supplied to the class
-            and generate simulations. We then use the IMNN to compress the sims
-            into summaries and compare those to the summary of the observed data.
+        Here we draw some parameter values from the prior supplied to the class
+        and generate simulations. We then use the IMNN to compress the sims
+        into summaries and compare those to the summary of the observed data.
 
-            All summaries are collected so that the acceptance epsilon can be
-            modified at the users will.
+        All summaries are collected so that the acceptance epsilon can be
+        modified at the users will.
 
-            Parameters
-            __________
-            draws : int
-                number of parameter draws to make, this number of simulations will
-                be run.
-            at_once : bool, optional
-                whether to run all the simulations at once in parallel (the
-                simulator function must handle this), or whether to run the
-                simulations one at a time.
-            save_sims : str, optional
-                if the sims are costly it might be worth saving them. if a string
-                is passed the sims will be saved as npz format from the arrays
-                created.
-            return_dict : bool, optional
-                the ABC_dict attribute is normally updated, but the dictionary can
-                be returned by the function. this is used by the PMC.
-            PMC : bool, optional
-                if this is true then the parameters are passed directly to ABC
-                rather than being drawn in the ABC. this is used by the PMC.
-            bar : func
-                the function for the progress bar. this must be different depending
-                on whether this is run in a notebook or not.
-            parameters : ndarray
-                the parameter values to run the simulations at
-            sims : ndarray
-                the simulations to compress to perform the ABC
-            estimates : ndarray
-                the estimates of the simulations from the IMNN
-            differences : ndarray
-                the difference between the observed data and all of the estimates
-            distances : ndarray
-                the distance mesure describing how similar the observed estimate is
-                to the estimates of the simulations
-            """
-            if utils().isnotebook():
-                bar = tqdm.tqdm_notebook
-            else:
-                bar = tqdm.tqdm
-            if PMC:
-                parameters = draws
-                draws = parameters.shape[0]
-            else:
-                parameters = self.prior.draw(to_draw=draws)
-            if at_once:
-                sims = self.simulator(parameters)
+        Parameters
+        __________
+        draws : int
+            number of parameter draws to make, this number of simulations will be run.
+        at_once : bool, optional
+            whether to run all the simulations at once in parallel (the
+            simulator function must handle this), or whether to run the
+            simulations one at a time.
+        save_sims : str, optional
+            if the sims are costly it might be worth saving them. if a string
+            is passed the sims will be saved as npz format from the arrays
+            created.
+        return_dict : bool, optional
+            the ABC_dict attribute is normally updated, but the dictionary can
+            be returned by the function. this is used by the PMC.
+        PMC : bool, optional
+            if this is true then the parameters are passed directly to ABC
+            rather than being drawn in the ABC. this is used by the PMC.
+        bar : func
+            the function for the progress bar. this must be different depending
+            on whether this is run in a notebook or not.
+        parameters : ndarray
+            the parameter values to run the simulations at
+        sims : ndarray
+            the simulations to compress to perform the ABC
+        estimates : ndarray
+            the estimates of the simulations from the IMNN
+        differences : ndarray
+            the difference between the observed data and all of the estimates
+        distances : ndarray
+            the distance mesure describing how similar the observed estimate is
+            to the estimates of the simulations
+        """
+        if PMC:
+            parameters = draws
+            draws = parameters.shape[0]
+        else:
+            parameters = self.prior.sample(draws)
+        if at_once:
+            sims = self.simulator(parameters)
+            if save_sims is not None:
+                np.savez(save_sims + ".npz", sims)
+            estimates = self.get_estimate(sims)
+        else:
+            estimates = np.zeros([draws, self.n_params])
+            for theta in bar(range(draws), desc="Simulations"):
+                sim = self.simulator([parameters[theta]])
                 if save_sims is not None:
-                    np.savez(save_sims + ".npz", sims)
-                estimates = self.get_estimate(sims)
-            else:
-                estimates = np.zeros([draws, self.n_params])
-                for theta in bar(range(draws), desc="Simulations"):
-                    sim = self.simulator([parameters[theta]])
-                    if save_sims is not None:
-                        np.savez(save_sims + "_" + str(theta), sim)
-                    estimates[theta] = self.get_estimate([sim])[0]
-            differences = estimates - self.estimate
-            distances = np.sqrt(
+                    np.savez(save_sims + "_" + str(theta), sim)
+                estimates[theta] = self.get_estimate([sim])[0]
+        differences = estimates - self.estimate
+        distances = np.sqrt(
+            np.einsum(
+                'ij,ij->i',
+                differences,
                 np.einsum(
-                    'ij,ij->i',
-                    differences,
-                    np.einsum(
-                        'jk,ik->ij',
-                        self.F,
-                        differences)))
+                    'jk,ik->ij',
+                    self.F,
+                    differences)))
 
-            if return_dict:
-                ABC_dict = {"parameters": parameters,
-                            "estimate": estimates,
-                            "differences": differences,
-                            "distances": distances}
-                return ABC_dict
-            else:
-                self.ABC_dict["parameters"] = np.concatenate(
-                    [self.ABC_dict["parameters"], parameters])
-                self.ABC_dict["estimate"] = np.concatenate(
-                    [self.ABC_dict["estimate"], estimates])
-                self.ABC_dict["differences"] = np.concatenate(
-                    [self.ABC_dict["differences"], differences])
-                self.ABC_dict["distances"] = np.concatenate(
-                    [self.ABC_dict["distances"], distances])
+        self.parameters = np.concatenate(
+                [self.parameters, parameters])
+        self.estimates = np.concatenate(
+                [estimates, estimates])
+        self.differences = np.concatenate(
+                [self.differences, differences])
+        self.distances = np.concatenate(
+                [self.distances, distances])
+        return self.parameters, self.estimates, self.differences, self.distances
 
-    class PMC:
-        def __init__(self):
-            print("PMC")
+class PopulationMonteCarlo(ApproximateBayesianComputation):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        #self.parameters = np.array([]).reshape((0, self.n_params)),
+        #self.estimates = np.array([]).reshape((0, self.n_params)),
+        #self.differences = np.array([]).reshape((0, self.n_params)),
+        #self.distances = np.array([])
+        self.total_draws = 0
             
-        def __call__(self, draws, posterior, criterion, at_once=True, save_sims=None,
-            restart=False):
-            """Population Monte Carlo
+    def __call__(self, draws, posterior, criterion, at_once=True, save_sims=None, restart=False):
+        """Population Monte Carlo
 
-            This is the population Monte Carlo sequential ABC method, highly
-            optimised for minimal numbers of drawsself.
+        This is the population Monte Carlo sequential ABC method, highly
+        optimised for minimal numbers of drawsself.
 
-            It works by first running an ABC and sorting the output distances,
-            keeping the closest n parameters (where n is the number of samples to
-            keep for the posterior) to get an initial proposal distribution.
+        It works by first running an ABC and sorting the output distances,
+        keeping the closest n parameters (where n is the number of samples to
+        keep for the posterior) to get an initial proposal distribution.
 
-            The proposal distribution is a Gaussian distribution with covariance
-            given by weighted parameter values. Each iteration of draws moves 25%
-            of the futhers samples until they are within the epsilon for that
-            iteration. Once this is done the new weighting is calculated depending
-            on the value of the new parameters and the new weighted covariance is
-            calculated.
+        The proposal distribution is a Gaussian distribution with covariance
+        given by weighted parameter values. Each iteration of draws moves 25%
+        of the futhers samples until they are within the epsilon for that
+        iteration. Once this is done the new weighting is calculated depending
+        on the value of the new parameters and the new weighted covariance is
+        calculated.
 
-            Convergence is classified with a criterion which compares how many
-            draws from the proposal distribution are needed to be accepted. When
-            the number of draws is large then the posterior is fairly stable and
-            can be trusted to really be approaching the true posterior distribution
+        Convergence is classified with a criterion which compares how many
+        draws from the proposal distribution are needed to be accepted. When
+        the number of draws is large then the posterior is fairly stable and
+        can be trusted to really be approaching the true posterior distribution
 
-            Parameters
-            __________
-            draws : int
-                number of parameter draws from the prior to make on initialisation
-            posterior : int
-                number of samples to keep from the final provided posterior
-            criterion : float
-                the ratio to the number of samples to obtain in from the final
-                posterior to the number of draws needed in an iteration.
-            at_once : bool, optional
-                whether to run all the simulations at once in parallel (the
-                simulator function must handle this), or whether to run the
-                simulations one at a time.
-            save_sims : str, optional
-                if the sims are costly it might be worth saving them. if a string
-                is passed the sims will be saved as npz format from the arrays
-                created.
-            restart : bool, optional
-                to restart the PMC from scratch set this value to true, otherwise
-                the PMC just carries on from where it last left off. note that the
-                weighting is reset, but it should level itself out after the first
-                iteration.
-            iteration : int
-                counter for the number of iterations of the PMC to convergence.
-            criterion_reached : float
-                the value of the criterion after each iteration. once this reaches
-                the supplied criterion value then the PMC stops.
-            weighting : ndarray
-                the weighting of the covariance for the proposal distribution.
-            cov : ndarray
+        Parameters
+        __________
+        draws : int
+            number of parameter draws from the prior to make on initialisation
+        posterior : int
+            number of samples to keep from the final provided posterior
+        criterion : float
+            the ratio to the number of samples to obtain in from the final
+            posterior to the number of draws needed in an iteration.
+        at_once : bool, optional
+            whether to run all the simulations at once in parallel (the
+            simulator function must handle this), or whether to run the
+            simulations one at a time.
+        save_sims : str, optional
+            if the sims are costly it might be worth saving them. if a string
+            is passed the sims will be saved as npz format from the arrays
+            created.
+        restart : bool, optional
+            to restart the PMC from scratch set this value to true, otherwise
+            the PMC just carries on from where it last left off. note that the
+            weighting is reset, but it should level itself out after the first
+            iteration.
+        iteration : int
+            counter for the number of iterations of the PMC to convergence.
+        criterion_reached : float
+            the value of the criterion after each iteration. once this reaches
+            the supplied criterion value then the PMC stops.
+        weighting : ndarray
+            the weighting of the covariance for the proposal distribution.
+        cov : ndarray
                 the covariance of the parameter samples for the proposal
-                distribution.
-            epsilon : float
-                the distance from the summary of the observed data where the
-                samples are accepted.
-            stored_move_ind : list
-                the indices of the most distant parameter values which need to be
-                moved during the PMC.
-            move_ind : list
-                the indices of the stored_move_ind which is decreased in size until
-                all of the samples have been moved inside the epsilon.
-            current_draws : int
-                the number of draws taken when moving the samples in the population
-            accepted_parameters : ndarray
-                the parameter values which have been successfully moved during PMC.
-            accepted_estimates : ndarray
-                the estimates which have successfully moved closer than epsilon.
-            accepted_differences : ndarray
-                the difference between the observed data and all of the summaries.
-            accepted_distances : ndarray
-                the distance mesure describing how similar the observed summary is
-                to the summaries of the simulations.
-            proposed_parameters : ndarray
-                the proposed parameter values to run simulations at to try and move
-                closer to the true observation.
-            temp_dictionary : dict
-                dictionary output of the ABC with all summaries, parameters and
-                distances.
-            accept_index : list
-                the indices of the accepted samples.
-            reject_index : list
-                the indices of the rejected samples.
-            inv_cov : ndarray
-                inverse covariance for the Gaussian proposal distribution.
-            dist : ndarray
-                the value of the proposal distribution at the accepted parameters.
-            diff : ndarray
-                difference between the accepted parameters and the parameter values
-                from the previous iteration.
-            """
-            if self.total_draws == 0 or restart:
-                self.PMC_dict = self.ABC(draws, at_once=at_once,
-                                         save_sims=save_sims, return_dict=True)
-                inds = self.PMC_dict["distances"].argsort()
-                self.PMC_dict["parameters"] = self.PMC_dict[
-                    "parameters"][inds[:posterior]]
-                self.PMC_dict["estimate"] = self.PMC_dict[
-                    "estimate"][inds[:posterior]]
-                self.PMC_dict["differences"] = self.PMC_dict[
-                    "differences"][inds[:posterior]]
-                self.PMC_dict["distances"] = self.PMC_dict[
-                    "distances"][inds[:posterior]]
-                self.total_draws = 0
+            distribution.
+        epsilon : float
+            the distance from the summary of the observed data where the
+            samples are accepted.
+        stored_move_ind : list
+            the indices of the most distant parameter values which need to be
+            moved during the PMC.
+        move_ind : list
+            the indices of the stored_move_ind which is decreased in size until
+            all of the samples have been moved inside the epsilon.
+        current_draws : int
+            the number of draws taken when moving the samples in the population
+        accepted_parameters : ndarray
+            the parameter values which have been successfully moved during PMC.
+        accepted_estimates : ndarray
+            the estimates which have successfully moved closer than epsilon.
+        accepted_differences : ndarray
+            the difference between the observed data and all of the summaries.
+        accepted_distances : ndarray
+            the distance mesure describing how similar the observed summary is
+            to the summaries of the simulations.
+        proposed_parameters : ndarray
+            the proposed parameter values to run simulations at to try and move
+            closer to the true observation.
+        temp_dictionary : dict
+            dictionary output of the ABC with all summaries, parameters and
+            distances.
+        accept_index : list
+            the indices of the accepted samples.
+        reject_index : list
+            the indices of the rejected samples.
+        inv_cov : ndarray
+            inverse covariance for the Gaussian proposal distribution.
+        dist : ndarray
+            the value of the proposal distribution at the accepted parameters.
+        diff : ndarray
+            difference between the accepted parameters and the parameter values
+            from the previous iteration.
+        """
+        if self.total_draws == 0 or restart:
+            #self.PMC_dict = self.ABC(draws, at_once=at_once,
+            #                            save_sims=save_sims, return_dict=True)
+            #inds = self.PMC_dict["distances"].argsort()
+            #self.PMC_dict["parameters"] = self.PMC_dict[
+            #    "parameters"][inds[:posterior]]
+            #self.PMC_dict["estimate"] = self.PMC_dict[
+            #    "estimate"][inds[:posterior]]
+            #self.PMC_dict["differences"] = self.PMC_dict[
+            #    "differences"][inds[:posterior]]
+            #self.PMC_dict["distances"] = self.PMC_dict[
+            #    "distances"][inds[:posterior]]
+            #self.total_draws = 0
 
             weighting = np.ones(posterior) / posterior
             iteration = 0
@@ -504,14 +489,14 @@ class ABC():
                       + ', total draws = ' + str(self.total_draws)
                       + ', ϵ = ' + str(epsilon) + '.', end='\r')
 
-class GaussianApproximation(ABC):
+class GaussianApproximation(LFI):
     def __init__(self, **kwargs):
-        self.log_likelihood = None
-        self.log_posterior = None
-        self.log_prior = None
-        self.grid = None
-        self.shape = None
-        super(GaussianApproximation, self).__init__(**kwargs)
+        setattr(self, "log_likelihood", None)
+        setattr(self, "log_posterior", None)
+        setattr(self, "log_prior", None)
+        setattr(self, "grid", None)
+        setattr(self, "shape", None)
+        super().__init__(simulator=None, **kwargs)
 
     def __call__(self, grid=None, gridsize=20, prior=True):
         self.check_prerun(grid, gridsize)

@@ -1,7 +1,9 @@
 import argparse
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 from IMNN.utils import TFRecords
+from IMNN.LFI.LFI import GaussianApproximation
 
 class GenerateGaussianNoise():
     def __init__(self, input_shape=(10,), n_params=2, n_summaries=2, n_s=1000, n_d=1000, n_d_small=100,
@@ -37,6 +39,18 @@ class GenerateGaussianNoise():
                   "whether both `numpy` and `tfrecords` files are saved, or just either one.")
             sys.exit()
         
+    def simulator(self, parameters, seed=None, simulator_args=None):
+        if seed is not None:
+            np.random.seed(seed)
+        if len(parameters.shape) == 1:
+            parameters = parameters[np.newaxis, :]
+        return np.moveaxis(
+            np.random.normal(
+                parameters[:, 0], 
+                np.sqrt(parameters[:, 1]), 
+                simulator_args["input_shape"] + (parameters.shape[0],)), 
+            -1, 0)
+        
     def generate_data(self, size="full"):
         self.check_selection(size)
         details = dict(
@@ -48,57 +62,97 @@ class GenerateGaussianNoise():
             fiducial=self.fiducial,
             delta=(2. * self.delta))
         
-        np.random.seed(self.training_seed)
-        a_0 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_s,) + self.input_shape)
-        np.random.seed(self.validation_seed)
-        a_1 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_s,) + self.input_shape)
+        a_0 = self.AL.simulator(
+            parameters=np.repeat(
+                self.fiducial[np.newaxis, :], 
+                self.n_s, 
+                axis=0),
+            seed=self.training_seed,
+            simulator_args={"input_shape": self.input_shape})
+        a_1 = self.AL.simulator(
+            parameters=np.repeat(
+                self.fiducial[np.newaxis, :], 
+                self.n_s, 
+                axis=0),
+            seed=self.validation_seed,
+            simulator_args={"input_shape": self.input_shape})
 
-        np.random.seed(self.training_seed)
-        b_0 = np.random.normal(
-            self.fiducial[0] - self.delta[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.validation_seed)
-        b_1 = np.random.normal(
-            self.fiducial[0] - self.delta[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.training_seed)
-        c_0 = np.random.normal(
-            self.fiducial[0] + self.delta[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.validation_seed)
-        c_1 = np.random.normal(
-            self.fiducial[0] + self.delta[0], 
-            np.sqrt(self.fiducial[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.training_seed)
-        d_0 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1] - self.delta[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.validation_seed)
-        d_1 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1] - self.delta[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.training_seed)
-        e_0 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1] + self.delta[1]), 
-            (self.n_d,) + self.input_shape)
-        np.random.seed(self.validation_seed)
-        e_1 = np.random.normal(
-            self.fiducial[0], 
-            np.sqrt(self.fiducial[1] + self.delta[1]), 
-            (self.n_d,) + self.input_shape)
+        b_0 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0] - self.delta[0], 
+                    self.fiducial[1]])[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.training_seed,
+            simulator_args={"input_shape": self.input_shape})
+        b_1 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0] - self.delta[0], 
+                    self.fiducial[1]])[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.validation_seed,
+            simulator_args={"input_shape": self.input_shape})        
+        c_0 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0] + self.delta[0], 
+                    self.fiducial[1]])[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.training_seed,
+            simulator_args={"input_shape": self.input_shape})
+        c_1 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0] + self.delta[0], 
+                    self.fiducial[1]])[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.validation_seed,
+            simulator_args={"input_shape": self.input_shape})
+        d_0 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0], 
+                    self.fiducial[1] - self.delta[1]]
+                )[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.training_seed,
+            simulator_args={"input_shape": self.input_shape})
+        d_1 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0], 
+                    self.fiducial[1] - self.delta[1]]
+                )[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.validation_seed,
+            simulator_args={"input_shape": self.input_shape})       
+        e_0 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0], 
+                    self.fiducial[1] + self.delta[1]]
+                )[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.training_seed,
+            simulator_args={"input_shape": self.input_shape})
+        e_1 = self.AL.simulator(
+            parameters=np.repeat(
+                np.array([
+                    self.fiducial[0], 
+                    self.fiducial[1] + self.delta[1]]
+                )[np.newaxis, :], 
+                self.n_d, 
+                axis=0),
+            seed=self.validation_seed,
+            simulator_args={"input_shape": self.input_shape}) 
 
         f_0 = np.stack((np.stack((b_0, c_0)), 
                         np.stack((d_0, e_0)))
@@ -176,6 +230,44 @@ class GenerateGaussianNoise():
                     n_params=result[0]["n_params"],
                     directory="{}/tfrecords".format(directory),
                     filename="derivative_small")
+                
+    def plot_data(self, data, ax=None, label=None):
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize = (5, 4))
+        ax.plot(data.T, label=label)
+        ax.legend(frameon=False)
+        ax.set_xlim([0, data.shape[-1] - 1])
+        ax.set_xticks([])
+        ax.set_ylabel("Data amplitude");
+
+class AnalyticLikelihood(GaussianApproximation):
+    def __init__(self, data, prior, generator, labels=None):
+        super().__init__(
+            target_data=data,
+            prior=prior,
+            F=None,
+            get_estimate=self.get_estimate,
+            simulator=generator.simulator,
+            labels=labels)
+        
+    def log_gaussian(self):
+        ''' The analytic likelihood (note that this isn't Gaussian, it's just called log_gaussian to overwrite log_gaussian from GaussianApproximation)
+        '''
+        sq_diff = (self.data[..., np.newaxis] - self.grid[:, 0])**2.
+        exp = np.sum(-0.5 * sq_diff / self.grid[:, 1], axis=1)
+        norm = -(self.data.shape[1] / 2.) * np.log(
+            2. * np.pi * self.grid[:, 1])[np.newaxis, ...]
+        return np.reshape(exp + norm, ((-1,) + self.shape))
+    
+    def Fisher(self, θ_fid):
+        return -np.array([
+            [- np.prod(self.data.shape[1:]) / θ_fid[1], 0.], 
+            [0. , - 0.5 * np.prod(self.data.shape[1:]) / θ_fid[1]**2.]])
+    
+    def get_estimate(self, data):
+        return np.array([np.mean(data, axis=1), 
+                         np.std(data, axis=1)**2]).T
+    
     
 def main(args):
     data = GenerateGaussianNoise(
