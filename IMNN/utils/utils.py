@@ -6,7 +6,7 @@ Docstrings need writing
 """
 
 
-__version__ = '0.2a4'
+__version__ = '0.2a5'
 __author__ = "Tom Charnock"
 
 

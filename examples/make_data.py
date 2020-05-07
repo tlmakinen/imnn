@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from IMNN.utils import TFRecords
 from IMNN.LFI.LFI import GaussianApproximation
 
+__version__ = "0.2a5"
+__author__ = "Tom Charnock"
+
 class GenerateGaussianNoise():
     def __init__(self, input_shape=(10,), n_params=2, n_summaries=2, n_s=1000, n_d=1000, n_d_small=100,
                  fiducial=np.array([0., 1.]), delta=np.array([0.1, 0.1]), training_seed=0,
@@ -44,6 +47,9 @@ class GenerateGaussianNoise():
             np.random.seed(seed)
         if len(parameters.shape) == 1:
             parameters = parameters[np.newaxis, :]
+        if self.n_params == 1:
+            parameters = np.repeat(parameters, 2, axis=1)
+            parameters[:, 0] = np.zeros_like(parameters[:, 0])
         return np.moveaxis(
             np.random.normal(
                 parameters[:, 0], 
@@ -241,7 +247,18 @@ class GenerateGaussianNoise():
         ax.set_ylabel("Data amplitude");
 
 class AnalyticLikelihood(GaussianApproximation):
-    def __init__(self, data, prior, generator, labels=None):
+    def __init__(self, data, prior, generator, parameters=2, labels=None):
+        if parameters == 2:
+            self.log_gaussian = self._mean_variance_likelihood
+            self.Fisher = self._mean_variance_Fisher
+            self.get_estimate = self._get_mean_variance
+        elif parameters == 1:
+            self.log_gaussian = self._variance_likelihood
+            self.Fisher = self._variance_Fisher
+            self.get_estimate = self._get_variance
+        else:
+            print("`parameters` must be 2 for mean and variance or 1 for just variance")
+            sys.exit()
         super().__init__(
             target_data=data,
             prior=prior,
@@ -249,23 +266,34 @@ class AnalyticLikelihood(GaussianApproximation):
             get_estimate=self.get_estimate,
             labels=labels)
         
-    def log_gaussian(self, grid, shape):
-        ''' The analytic likelihood (note that this isn't Gaussian, it's just called log_gaussian to overwrite log_gaussian from GaussianApproximation)
-        '''
+    def _mean_variance_likelihood(self, grid, shape):
         sq_diff = (self.data[..., np.newaxis] - grid[:, 0])**2.
         exp = np.sum(-0.5 * sq_diff / grid[:, 1], axis=1)
         norm = -(self.data.shape[1] / 2.) * np.log(
             2. * np.pi * grid[:, 1])[np.newaxis, ...]
         return np.reshape(exp + norm, ((-1,) + shape))
     
-    def Fisher(self, θ_fid):
+    def _variance_likelihood(self, grid, shape):
+        sq = self.data[..., np.newaxis]**2.
+        exp = np.sum(-0.5 * sq / grid[:, 0], axis=1)
+        norm = -(self.data.shape[1] / 2.) * np.log(
+            2. * np.pi * grid[:, 0])[np.newaxis, ...]
+        return np.reshape(exp + norm, ((-1,) + shape))
+    
+    def _mean_variance_Fisher(self, θ_fid):
         return -np.array([
             [- np.prod(self.data.shape[1:]) / θ_fid[1], 0.], 
             [0. , - 0.5 * np.prod(self.data.shape[1:]) / θ_fid[1]**2.]])
     
-    def get_estimate(self, data):
+    def _variance_Fisher(self, θ_fid):
+        return -np.array([[- 0.5 * np.prod(self.data.shape[1:]) / θ_fid[0]**2.]])
+    
+    def _get_mean_variance(self, data):
         return np.array([np.mean(data, axis=1), 
                          np.std(data, axis=1)**2]).T
+    
+    def _get_variance(self, data):
+        return np.array([np.std(data, axis=1)**2]).T
     
     
 def main(args):

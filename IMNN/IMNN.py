@@ -9,7 +9,7 @@ Still some docstrings which need finishing
 Use precomputed external covariance and derivatives"""
 
 
-__version__ = '0.2a4'
+__version__ = '0.2a5'
 __author__ = "Tom Charnock"
 
 
@@ -715,7 +715,7 @@ class IMNN():
             the index labelling the parameter
         """
         features = {
-            "index": tf.io.FixedLenFeature([], tf.int64),
+            "seed": tf.io.FixedLenFeature([], tf.int64),
             "data": tf.io.FixedLenFeature([], tf.string),
             "derivative": tf.io.FixedLenFeature([], tf.int64),
             "parameter": tf.io.FixedLenFeature([], tf.int64)}
@@ -723,7 +723,7 @@ class IMNN():
         data = tf.reshape(
             tf.io.decode_raw(parsed_example["data"], self.dtype),
             self.input_shape)
-        index = tf.cast(parsed_example["index"], self.itype)
+        index = tf.cast(parsed_example["seed"], self.itype)
         derivative = tf.cast(parsed_example["derivative"], self.itype)
         parameter = tf.cast(parsed_example["parameter"], self.itype)
         return data, (index, derivative, parameter)

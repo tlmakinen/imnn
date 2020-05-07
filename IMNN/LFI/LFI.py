@@ -14,13 +14,11 @@ __author__ = "Tom Charnock"
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 import sys
 from IMNN.utils.utils import utils
 import tqdm
-tfd = tfp.distributions
 np.set_printoptions(precision=3, suppress=True)
 
 class LFI():
@@ -412,21 +410,17 @@ class ApproximateBayesianComputation(LFI):
             self.__call__(draws=min_draws, at_once=at_once, 
                           save_sims=save_sims)
         self.accept_reject(ϵ=ϵ)
-        if utils().isnotebook(tqdm_notebook):
-            bar = tqdm.tqdm_notebook(total=np.inf, desc="Draws")
-        else:
-            bar = tqdm.tqdm(total=np.inf, desc="Draws")
+        if np.any(self.num_accepted < accepted):
+            if utils().isnotebook(tqdm_notebook):
+                bar = tqdm.tqdm_notebook(total=np.inf, desc="Draws")
+            else:
+                bar = tqdm.tqdm(total=np.inf, desc="Draws")
         while np.any(self.num_accepted < accepted):
             self.__call__(draws=min_draws, at_once=at_once, 
                           save_sims=save_sims)
             self.accept_reject(ϵ=ϵ)
             bar.update(self.num_draws)
             bar.set_postfix(Accepted=self.num_accepted, Remaining=accepted-self.num_accepted)
-            #print("Number of draws = {}, Number accepted = {}, "
-            #      "Number remaining = {}".format(
-            #          self.num_draws, self.num_accepted, 
-            #          accepted-self.num_accepted), 
-            #      end="\r", flush=True)
         
     def posterior(self, bins=25, ranges=None, **kwargs):
         self.setup_points(**kwargs)
@@ -475,8 +469,9 @@ class ApproximateBayesianComputation(LFI):
             plot_rejected = True
         else:
             plot_rejected = False
-        if self.rejected_parameters.shape[1] == 0:
-            plot_rejected = False
+        for i in range(self.targets):
+            if self.rejected_parameters[i].shape[0] == 0:
+                plot_rejected = False
         if self.targets > 1:
             accepted_labels = ["Accepted simulations {}".format(i+1) 
                                for i in range(self.targets)]
@@ -673,48 +668,47 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
             difference between the accepted parameters and the parameter values
             from the previous iteration.
         """
-        if (draws is None) and (self.parameters.shape[0] == 0):
+        if ((draws is None) or (criterion is None) or (initial_draws is None)) and (self.parameters.shape[0] == 0):
             print("PMC has not yet been run. Please pass `draws`, `initial_draws` and a criterion value.")
             sys.exit()
-        elif self.parameters.shape[0] > 0:
-            return None
-        if ((initial_draws is None) or (criterion is None)) and ((self.parameters.shape[0] == 0) or (draws > self.parameters.shape[0])):
-            print("Please pass `initial_draws` equal to or larger than `draws`.")
-            sys.exit()
-        if draws > self.parameters.shape[0]:
-            if self.parameters.shape[0] == 0:
-                self.ABC(initial_draws, at_once=at_once, save_sims=save_sims)
-                self.parameters = np.repeat(
-                    self.parameters[np.newaxis, ...], 
-                    self.targets, axis=0)
-                self.estimates = np.repeat(
-                    self.estimates[np.newaxis, ...],
-                    self.targets, axis=0)
-                self.differences = np.moveaxis(self.differences, 0, 1)
-                self.distances = np.moveaxis(self.distances, 0, 1)
-                self.weighting = np.ones((self.targets, initial_draws)) / draws
-            else:
-                parameters, estimates, differences, distances = self.ABC(initial_draws, at_once=at_once, save_sims=save_sims, update=False)
-                self.parameters = np.concatenate(
-                    [self.parameters, 
-                     np.repeat(
-                         parameters[np.newaxis, ...], 
-                         self.targets, axis=0)], axis=1)
-                self.estimates = np.concatenate(
-                    [self.estimates, 
-                     np.repeat(
-                         estimates[np.newaxis, ...],
-                         self.targets, axis=0)], axis=1)
-                self.differences = np.concatenate(
-                    [self.differences, 
-                     np.moveaxis(differences, 0, 1)], axis=1)
-                self.distances = np.concatenate(
-                    [self.distances, 
-                     np.moveaxis(distances, 0, 1)], axis=1)
-                self.weighting = np.concatenate(
-                    [self.weighting, np.zeros((self.targets, initial_draws))], axis=1)
-            self.sort(draws=draws)
-            self.num_draws = np.zeros(self.targets)
+        if draws is not None:
+            if initial_draws < draws:
+                print("`initial_draws` must be equal to or greater than `draws`.")
+                sys.exit()
+            if draws > self.parameters.shape[0]:
+                if self.parameters.shape[0] == 0:
+                    self.ABC(initial_draws, at_once=at_once, save_sims=save_sims)
+                    self.parameters = np.repeat(
+                        self.parameters[np.newaxis, ...], 
+                        self.targets, axis=0)
+                    self.estimates = np.repeat(
+                        self.estimates[np.newaxis, ...],
+                        self.targets, axis=0)
+                    self.differences = np.moveaxis(self.differences, 0, 1)
+                    self.distances = np.moveaxis(self.distances, 0, 1)
+                    self.weighting = np.ones((self.targets, initial_draws)) / draws
+                    self.num_draws = np.zeros(self.targets)
+                else:
+                    parameters, estimates, differences, distances = self.ABC(initial_draws, at_once=at_once, save_sims=save_sims, update=False)
+                    self.parameters = np.concatenate(
+                        [self.parameters, 
+                         np.repeat(
+                             parameters[np.newaxis, ...], 
+                             self.targets, axis=0)], axis=1)
+                    self.estimates = np.concatenate(
+                        [self.estimates, 
+                         np.repeat(
+                             estimates[np.newaxis, ...],
+                             self.targets, axis=0)], axis=1)
+                    self.differences = np.concatenate(
+                        [self.differences, 
+                         np.moveaxis(differences, 0, 1)], axis=1)
+                    self.distances = np.concatenate(
+                        [self.distances, 
+                         np.moveaxis(distances, 0, 1)], axis=1)
+                    self.weighting = np.concatenate(
+                        [self.weighting, np.zeros((self.targets, initial_draws))], axis=1)
+                self.sort(draws=draws)
             if percentile is None:
                 ϵ_ind = -1
                 to_accept = 1
@@ -736,6 +730,8 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                         aweights=self.weighting[i], 
                         rowvar=False)
                     for i in targets])
+                if self.n_params == 1:
+                    cov = cov[:, np.newaxis, np.newaxis]
                 inv_cov = np.linalg.inv(cov)
                 ϵ = self.distances[targets, ϵ_ind]
                 a_ind = np.arange(to_accept * targets.shape[0])
