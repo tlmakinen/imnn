@@ -676,7 +676,7 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
         if (draws is None) and (self.parameters.shape[0] == 0):
             print("PMC has not yet been run. Please pass `draws`, `initial_draws` and a criterion value.")
             sys.exit()
-        else:
+        elif self.parameters.shape[0] > 0:
             return None
         if ((initial_draws is None) or (criterion is None)) and ((self.parameters.shape[0] == 0) or (draws > self.parameters.shape[0])):
             print("Please pass `initial_draws` equal to or larger than `draws`.")
