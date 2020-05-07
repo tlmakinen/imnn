@@ -245,19 +245,18 @@ class AnalyticLikelihood(GaussianApproximation):
         super().__init__(
             target_data=data,
             prior=prior,
-            F=None,
+            Fisher=None,
             get_estimate=self.get_estimate,
-            simulator=generator.simulator,
             labels=labels)
         
-    def log_gaussian(self):
+    def log_gaussian(self, grid, shape):
         ''' The analytic likelihood (note that this isn't Gaussian, it's just called log_gaussian to overwrite log_gaussian from GaussianApproximation)
         '''
-        sq_diff = (self.data[..., np.newaxis] - self.grid[:, 0])**2.
-        exp = np.sum(-0.5 * sq_diff / self.grid[:, 1], axis=1)
+        sq_diff = (self.data[..., np.newaxis] - grid[:, 0])**2.
+        exp = np.sum(-0.5 * sq_diff / grid[:, 1], axis=1)
         norm = -(self.data.shape[1] / 2.) * np.log(
-            2. * np.pi * self.grid[:, 1])[np.newaxis, ...]
-        return np.reshape(exp + norm, ((-1,) + self.shape))
+            2. * np.pi * grid[:, 1])[np.newaxis, ...]
+        return np.reshape(exp + norm, ((-1,) + shape))
     
     def Fisher(self, θ_fid):
         return -np.array([
