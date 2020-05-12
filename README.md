@@ -51,7 +51,7 @@ or
 ```
 git clone https://github.com/tomcharnock/IMNN.git
 cd IMNN
-python3 setup.py
+python3 setup.py install
 ```
 
 # Modules
