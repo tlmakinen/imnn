@@ -6,33 +6,33 @@ Optimising a neural network to maximise the Fisher information provides us with 
 
 The module here provides both the routines for fitting a neural network by maximising the Fisher information as well as a few methods for performing likelihood-free inference and approximate Bayesian computation.
 
-Specifically, the neural network takes some data, <img style="height:0.9em;vertical-align:center;" src="figures/tex/d.svg"/>, and maps it to a compressed summary, <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/fdx.svg"/>, where <img style="height:0.6em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/x.svg"/> can have the same dimensionality as that of the parameter space, rather than the data space, potentially without losing any information. To do so we maximise the Fisher information of the summary statistics provided by the neural network, and in doing so, find a functional form of the optimal compression.
+Specifically, the neural network takes some data, <img src="https://render.githubusercontent.com/render/math?math={\bf d}">, and maps it to a compressed summary, <img src="https://render.githubusercontent.com/render/math?math=\mathcal{f}:{\bf d}\to{\bf x}">, where <img src="https://render.githubusercontent.com/render/math?math={\bf x}"> can have the same dimensionality as that of the parameter space, rather than the data space, potentially without losing any information. To do so we maximise the Fisher information of the summary statistics provided by the neural network, and in doing so, find a functional form of the optimal compression.
 
-To train the neural network a batch of simulations <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid.svg"/> created at a fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid.svg"/> for training (and another for validation). These simulations are compressed by the neural network to obtain some statistic <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/x_fid.svg"/>, i.e. the output of the neural network. We can use these to calculate the covariance, <img style="height:1.3em;vertical-align:bottom;padding-bottom:0.1em;" src="figures/tex/C.svg"/>, of the compressed summaries. The sensitivity to model parameters uses the derivative of the simulation. This can be provided analytically or numercially using <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid+.svg"/> created above the fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid+.svg"/> and <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid-.svg"/> created below the fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid-.svg"/>. The simulations are compressed using the network and used to find mean of the summaries 
+To train the neural network a batch of simulations <img src="https://render.githubusercontent.com/render/math?math={\bf d}^\textrm{fid}_\textrm{sim}"> created at a fiducial parameter value <img src="https://render.githubusercontent.com/render/math?math=\boldsymbol{\theta}^\textrm{fid}"> for training (and another for validation). These simulations are compressed by the neural network to obtain some statistic <img src="https://render.githubusercontent.com/render/math?math={\bf x}^\textrm{fid}_\textrm{sim}">, i.e. the output of the neural network. We can use these to calculate the covariance, <img src="https://render.githubusercontent.com/render/math?math={\bf C}_\mathcal{f}">, of the compressed summaries. The sensitivity to model parameters uses the derivative of the simulation. This can be provided analytically or numercially using  <img src="https://render.githubusercontent.com/render/math?math={\bf d}^{\textrm{fid}%2B}_\textrm{sim}"> created above the fiducial parameter value <img src="https://render.githubusercontent.com/render/math?math=\boldsymbol{\theta}^{\textrm{fid}%2B}"> and  <img src="https://render.githubusercontent.com/render/math?math={\bf d}^{\textrm{fid}-}_\textrm{sim}"> created below the fiducial parameter value <img src="https://render.githubusercontent.com/render/math?math=\boldsymbol{\theta}^{\textrm{fid}-}">. The simulations are compressed using the network and used to find mean of the summaries 
 
-<img style="height:3.5em;" src="figures/tex/eq1.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\displaystyle\frac{\partial\boldsymbol{\mu}_\mathcal{f}}{\partial\theta_\alpha}=\frac{1}{n_\textrm{deriv}}\sum_{i=1}^{n_\textrm{deriv}}\frac{{\bf x}_i^{\textrm{fid}%2B}-{\bf x}_i^{\textrm{fid}-}}{\theta_\alpha^{\textrm{fid}%2B}-\theta_\alpha^{\textrm{fid}-}}">
 
 If the derivative of the simulations with respect to the parameters can be calculated analytically (or via autograd, etc.) then that can be used directly using the chain rule since the derivative of the network outputs with respect to the network input can be calculated easily
 
-<img style="height:3.5em;" src="figures/tex/eq2.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\displaystyle\frac{\partial\boldsymbol{\mu}_\mathcal{f}}{\partial\theta_\alpha}=\frac{1}{n_\textrm{sims}}\sum_{i=1}^{n_\textrm{sims}}\frac{\partial{\bf x}_i^\textrm{fid}}{\partial{\bf d}_j^\textrm{fid}}\frac{\partial{\bf d}_j^\textrm{fid}}{\partial\theta_\alpha}\delta_{ij}">
 
-We then use <img style="height:1.3em;vertical-align:bottom;padding-bottom:0.1em;" src="figures/tex/C.svg"/> and <img style="height:1.6em;vertical-align:bottom;" src="figures/tex/der.svg"/> to calculate the Fisher information
+We then use <img src="https://render.githubusercontent.com/render/math?math={\bf C}_\mathcal{f}"> and <img src="https://render.githubusercontent.com/render/math?math=\partial\boldsymbol{\mu}_\mathcal{f}/\partial\theta_\alpha"> to calculate the Fisher information
 
-<img style="height:3.5em;" src="figures/tex/eq3.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\displaystyle{\bf F}_{\alpha\beta}=\frac{\partial\boldsymbol{\mu}_\mathcal{f}}{\partial\theta_\alpha}^T{\bf C}^{-1}_\mathcal{f}\frac{\partial\boldsymbol{\mu}_\mathcal{f}}{\partial\theta_\beta}">
 
 Since any linear rescaling of the summaries is also a summary, when maximising the Fisher information we set their scale using
 
-<img style="height:1.5em;" src="figures/tex/eq4.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\Lambda = -\ln|{\bf F}_{\alpha\beta}|%2Br(\Lambda_2)\Lambda_2">
 
 where 
 
-<img style="height:1.7em;" src="figures/tex/eq5.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\Lambda_2 = ||{\bf C}_\mathcal{f}-\mathbb{1}||_2%2B||{\bf C}_\mathcal{f}^{-1}-\mathbb{1}||_2">
 
 is a regularisation term whose strength is dictated by 
 
-<img style="height:3em;" src="figures/tex/eq6.svg"/>
+<img src="https://render.githubusercontent.com/render/math?math=\displaystyle r(\Lambda_2)=\frac{\lambda\Lambda_2}{\Lambda_2%2B\exp(-\alpha\Lambda_2)}">
 
-with <img style="height:1em;vertical-align:center" src="figures/tex/lambda.svg"/> as a strength and <img style="height:0.6em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/alpha.svg"/> as a rate parameter which can be determined from a closeness condition on the Frobenius norm of the difference between the convariance (and inverse covariance) from the identity matrix.
+with <img src="https://render.githubusercontent.com/render/math?math=\lambda"> as a strength and <img src="https://render.githubusercontent.com/render/math?math=\alpha"> as a rate parameter which can be determined from a closeness condition on the Frobenius norm of the difference between the convariance (and inverse covariance) from the identity matrix.
 
 When using this code please cite 
 ```
