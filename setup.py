@@ -12,7 +12,7 @@ setuptools.setup(
         data by maximising the Fisher information",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/tomcharnock/information_maximiser.git",
+    url="https://github.com/tomcharnock/IMNN.git",
     packages=["IMNN", "IMNN.LFI", "IMNN.utils"],
     classifiers=[
         "Programming Language :: Python :: 3.7",
@@ -24,6 +24,6 @@ setuptools.setup(
           "tensorflow>=2.1.0",
           "tqdm>=4.31.0",
           "numpy>=1.16.0",
-          "scipy>=1.4.1"
-      ],
+          "scipy>=1.4.1",
+          "matplotlib"],
 )

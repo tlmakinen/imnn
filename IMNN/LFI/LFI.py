@@ -464,7 +464,6 @@ class ApproximateBayesianComputation(LFI):
             sys.exit()
             
     def _scatter_plot(self, axes="parameter_estimate", rejected=0.1, ax=None, figsize=None, wspace=0, hspace=0, **kwargs):
-
         if rejected > 0:
             plot_rejected = True
         else:

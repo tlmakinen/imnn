@@ -1,359 +1,202 @@
 
+# Information maximising neural networks
+________________________________________
 
-```python
-%load_ext autoreload
-%autoreload 2
-```
+Optimising a neural network to maximise the Fisher information provides us with a function able to massively compress data without losing information about parameters of interest. This function can then be used for likelihood-free inference.
 
-# Information maximiser
+The module here provides both the routines for fitting a neural network by maximising the Fisher information as well as a few methods for performing likelihood-free inference and approximate Bayesian computation.
 
-Using neural networks, sufficient statistics can be obtained from data by maximising the Fisher information.
+Specifically, the neural network takes some data, <img style="height:0.9em;vertical-align:center;" src="figures/tex/d.svg"/>, and maps it to a compressed summary, <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/fdx.svg"/>, where <img style="height:0.6em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/x.svg"/> can have the same dimensionality as that of the parameter space, rather than the data space, potentially without losing any information. To do so we maximise the Fisher information of the summary statistics provided by the neural network, and in doing so, find a functional form of the optimal compression.
 
-The neural network takes some data ${\bf d}$ and maps it to a compressed summary $\mathscr{f}:{\bf d}\to{\bf x}$ where ${\bf x}$ can have the same size as the dimensionality of the parameter space, rather than the data space.
+To train the neural network a batch of simulations <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid.svg"/> created at a fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid.svg"/> for training (and another for validation). These simulations are compressed by the neural network to obtain some statistic <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/x_fid.svg"/>, i.e. the output of the neural network. We can use these to calculate the covariance, <img style="height:1.3em;vertical-align:bottom;padding-bottom:0.1em;" src="figures/tex/C.svg"/>, of the compressed summaries. The sensitivity to model parameters uses the derivative of the simulation. This can be provided analytically or numercially using <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid+.svg"/> created above the fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid+.svg"/> and <img style="height:1.4em;vertical-align:bottom;padding-bottom:0.2em;" src="figures/tex/d_fid-.svg"/> created below the fiducial parameter value <img style="height:1.2em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/theta_fid-.svg"/>. The simulations are compressed using the network and used to find mean of the summaries 
 
-To train the neural network a batch of simulations ${\bf d}_{\sf sim}^{\sf fid}$ created at a fiducial parameter value $\boldsymbol{\theta}^{\rm fid}$ are compressed by the neural network to obtain ${\bf x}_{\sf sim}^{\sf fid}$. From this we can calculate the covariance ${\bf C_\mathscr{f}}$ of the compressed summaries. We learn about model parameter distributions using the derivative of the simulation. This can be provided analytically or numercially using ${\bf d}_{\sf sim}^{\sf fid+}$ created above the fiducial parameter value $\boldsymbol{\theta}^{\sf fid+}$ and ${\bf d}_{\sf sim}^{\sf fid-}$ created below the fiducial parameter value $\boldsymbol{\theta}^{\sf fid-}$. The simulations are compressed using the network and used to find mean of the summaries
-$$\frac{\partial\boldsymbol{\mu}_\mathscr{f}}{\partial\theta_\alpha}=\frac{1}{n_\textrm{derivs}}\sum_{i=1}^{n_\textrm{derivs}}\frac{{\bf x}_{\sf sim}^{\sf fid+}-{\bf x}_{\sf sim}^{\sf fid-}}{\boldsymbol{\theta}^{\sf fid+}-\boldsymbol{\theta}^{\sf fid-}}.$$
+<img style="height:3.5em;" src="figures/tex/eq1.svg"/>
+
 If the derivative of the simulations with respect to the parameters can be calculated analytically (or via autograd, etc.) then that can be used directly using the chain rule since the derivative of the network outputs with respect to the network input can be calculated easily
-$$\frac{\partial\mu_\mathscr{f}}{\partial\theta_\alpha} = \frac{1}{n_{\textrm{sims}}}\sum_{i=1}^{n_{\textrm{sims}}}\frac{\partial{\bf x}_i}{\partial{\bf d}_j}\frac{\partial{\bf d}_j}{\partial\theta_\alpha}\delta_{ij}.$$
-We then use ${\bf C}_\mathscr{f}$ and $\boldsymbol{\mu}_\mathscr{f},_\alpha$ to calculate the Fisher information
-$${\bf F}_{\alpha\beta} = \boldsymbol{\mu}_\mathscr{f},^T_{\alpha}{\bf C}^{-1}_\mathscr{f}\boldsymbol{\mu}_\mathscr{f},_{\beta}.$$
-We want to maximise the Fisher information, and we want the summaries to be orthogonal so to train the network we minimise the loss function
-    $$\Lambda = -\ln|{\bf F}_{\alpha\beta}|+r(\Lambda_2)\Lambda_2$$
-where
-    $$\Lambda_2 = ||{\bf C}_\mathscr{f}-\mathbb{1}||_2 + ||{\bf C}_\mathscr{f}^{-1}-\mathbb{1}||_2$$
-is a regularisation term whose strength is dictated by
-    $$r(\Lambda_2) = \frac{\lambda\Lambda_2}{\Lambda_2 + \exp(-\alpha\Lambda_2)}$$
-where $\lambda$ is a strength and $\alpha$ is a rate parameter which can be determined from a closeness condition on the Frobenius norm of the difference between the convariance (and inverse covariance) from the identity matrix.
 
-When using this code please cite <a href="https://arxiv.org/abs/1802.03537">arXiv:1802.03537</a>.<br><br>
+<img style="height:3.5em;" src="figures/tex/eq2.svg"/>
+
+We then use <img style="height:1.3em;vertical-align:bottom;padding-bottom:0.1em;" src="figures/tex/C.svg"/> and <img style="height:1.6em;vertical-align:bottom;" src="figures/tex/der.svg"/> to calculate the Fisher information
+
+<img style="height:3.5em;" src="figures/tex/eq3.svg"/>
+
+Since any linear rescaling of the summaries is also a summary, when maximising the Fisher information we set their scale using
+
+<img style="height:1.5em;" src="figures/tex/eq4.svg"/>
+
+where 
+
+<img style="height:1.7em;" src="figures/tex/eq5.svg"/>
+
+is a regularisation term whose strength is dictated by 
+
+<img style="height:3em;" src="figures/tex/eq6.svg"/>
+
+with <img style="height:1em;vertical-align:center" src="figures/tex/lambda.svg"/> as a strength and <img style="height:0.6em;vertical-align:bottom;padding-bottom:0.4em;" src="figures/tex/alpha.svg"/> as a rate parameter which can be determined from a closeness condition on the Frobenius norm of the difference between the convariance (and inverse covariance) from the identity matrix.
+
+When using this code please cite 
+```
+Tom Charnock, Guilhem Lavaux and Benjamin D. Wandelt : Automatic physical inference with information maximizing neural networks. (2018) Physical Review D. 97 083004
+doi:10.1103/PhysRevD.97.083004
+arXiv:1802.03537
+```
 The code in the paper can be downloaded as v1 or v1.1 of the code kept on zenodo:<br><br>
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1175196.svg)](https://doi.org/10.5281/zenodo.1175196)
 <br>
 
-This code is run using<br>
->`python v3.7.4`
-
->`tensorflow==2.0.0`
-
->`numpy==1.16.2`
-
->`tqdm==4.31.1`
-
-Although these precise versions may not be necessary, I have put them here to avoid possible conflicts.
-
-It is recommended to git pull this repo and then install the IMNN locally by running
-
+The code can be installed using 
 ```
-python3 -m pip install --user -e .
+pip install IMNN
+```
+or
+```
+git clone https://github.com/tomcharnock/IMNN.git
+cd IMNN
+python3 setup.py
 ```
 
+# Modules
+_________
 
-## Load modules
+Available are modules for fitting the IMNN in `IMNN` and for doing likelihood-free inference in `LFI`. Examples of how to use these modules are available in the `examples` directory.
 
+# IMNN
+_______
 
+The basic call for the IMNN is
 ```python
-%matplotlib inline
-import numpy as np
-import matplotlib.pyplot as plt
-import tensorflow as tf
-from IMNN import IMNN
-from IMNN.ABC import ABC, priors
+imnn = IMNN.IMNN(
+    n_s, n_d, n_params, n_summaries, θ_fid, δθ, input_shape, 
+    fiducial, derivative, validation_fiducial, validation_derivative, 
+    {model}, {optimiser}, {save}, {load}, {weights}, {directory},
+    {filename}, {at_once}, {map_fn}, {check_shape}, {verbose}, 
+    {dtype}, {itype})
 ```
+where
+ - `n_s` - number of simulations to calculate covariance of fiducial simulations
+ - `n_d` - number of simulations to calculate mean of the derivative simulations
+ - `n_params` - number of parameters in the model
+ - `n_summaries` - number of summaries to compress the data to
+ - `θ_fid` - fiducial parameter values
+ - `δθ` - parameter differences for numerical derivative
+ - `input_shape` - shape of a single simulation
+ - `fiducial` - a numpy array of fiducial simulations, generative function of indivdidual fiducial simulations, or list of TFRecord filenames
+ - `derivative` -  a numpy array of derivative simulations, generative function of indivdidual derivative simulations, or list of TFRecord filenames
+ - `validation_fiducial` - a numpy array of fiducial simulations, generative function of indivdidual fiducial simulations, or list of TFRecord filenames
+ - `validation_derivative` -  a numpy array of derivative simulations, generative function of indivdidual derivative simulations, or list of TFRecord filenames
+ - `model` - a `keras`-like model (optional if loading)
+ - `optimiser` - a `keras`-like optimiser (optional if loading)
+ - `save` - boolean describing whether to save or not (need `directory` and `filename` if `save=True`)
+ - `load` - boolean describing whether to load model or not (need `directory`, `filename` and optionally `weights` if `load=True`)
+ - `weights` - string with name of file of saved weights
+ - `directory` - string with directory to load or save model
+ - `filename` - string with filename to load or save model
+ - `at_once` - number of simulations to process with model at once (should be `n_s` if memory is large enough)
+ - `map_fn` - function to preprocess data (`None` if no preprocessing)
+ - `check_shape` - boolean describing whether to check shape of simulation on initialisation
+ - `verbose` - boolean to turn on and off descriptive write out
+ - `dtype` - TensorFlow float type (default `tf.float32`)
+ - `itype` - TensorFlow int type (default `tf.int32)
 
-# Summarising the mean and the variance
-
-For this example we are going to use $n_{\bf d}=10$ data points of a 1D field of Gaussian noise with unknown mean and variance to see if the network can learn to summarise them.<br><br>
-
-The likelihood is given by
-$$\mathcal{L} = \prod_i^{n_{\bf d}}\frac{1}{\sqrt{2\pi|\Sigma|}}\exp\left[-\frac{1}{2}\frac{(d_i-\mu)^2}{\Sigma}\right]$$
-
-We can solve this problem analytically, so it is useful to check how well the network does. There is a single sufficient statistic which describes each the mean and the variance, which can be found by finding the maximum of the probability. We find that
-$$\sum_i^{n_{\bf d}}d_i = \mu\textrm{ and }\sum_i^{n_{\bf d}}(d_i-\mu)^2=n_{\bf d}\Sigma$$
-
-We can calculate the Fisher information by taking the negative of second derivative of the likelihood taking the expectation by inserting the above relations at examining at some fiducial parameter values
-$${\bf F}_{\alpha\beta} = -\left.\left(\begin{array}{cc}\displaystyle-\frac{n_{\bf d}}{\Sigma}&0\\0&\displaystyle-\frac{n_{\bf d}}{2\Sigma^2}\end{array}\right)\right|_{\textrm{fiducial}}.$$
-If we choose a fiducial mean of $\mu^{\textrm{fid}}=0$ and variance of $\Sigma^{\textrm{fid}} = 1$ then we obtain a Fisher information matrix of
-
-
-
-
-
+### Fit
 ```python
-input_shape = (10,)
-
-n_params = 2
-θ_fid = np.array([0, 1.])
+imnn.fit(
+    {n_iterations}, {λ}, {ϵ}, {reset}, {patience}, {min_iterations}, {checkpoint},
+    {tqdm_notebook}, {weight_file})
 ```
-
-
+where
+ - `n_iterations` - number of iterations to run the fitting for (can be None when using patience)
+ - `λ` - strength of the regularisation
+ - `ϵ` - distance of covariance (and inverse covariance) from the identity
+ - `reset` - boolean describing whether to reset weights and start training from scratch
+ - `patience` - number of iterations of decreasing Fisher information of the validation set before stopping
+ - `min_iterations` - number of iterations before early stopping turns on
+ - `checkpoint` - number of iterations between model saving (default turned off)
+ - `tqdm_notebook` - True if using a Jupyter notebook and False otherwise #TODO - make automatic (might already be implemented)
+ - `weight_file` - string with filename to save model weights to
+ 
+Once trained, statistics are saved in a history dictionary attribute `imnn.history`
+ - `"det_F"` - determinant of the Fisher information of the training set
+ - `"det_C"` - determinant of the covariance matrix of the training set
+ - `"det_Cinv"` - determinant of the inverse covariance matrix of the training set
+ - `"dμ_dθ"` - derivative of the mean of the training set summaries
+ - `"reg"` - value of the regularisation
+ - `"r"` - value of the dynamic strength of the regularisation
+ - `"val_det_F"` - determinant of the Fisher information of the validation set
+ - `"val_det_C"` - determinant of the covariance matrix of the validation set
+ - `"val_det_Cinv"` - determinant of the inverse covariance matrix of the validation set
+ - `"val_dμ_dθ"` - derivative of the mean of the validation set summaries
+ 
+### Plot
 ```python
-exact_fisher = -np.array([[-input_shape[0] / θ_fid[1], 0.], [0. , - 0.5 * input_shape[0] / θ_fid[1]**2.]])
-determinant_exact_fisher = np.linalg.det(exact_fisher)
-print("determinant of the Fisher information", determinant_exact_fisher)
-plt.imshow(np.linalg.inv(exact_fisher))
-plt.title("Inverse Fisher matrix")
-plt.xticks([0, 1], [r"$\mu$", r"$\Sigma$"])
-plt.yticks([0, 1], [r"$\mu$", r"$\Sigma$"])
-plt.colorbar();
+imnn.plot(
+    {regulariser}, {known_det_fisher}, {figsize})
 ```
-
-    determinant of the Fisher information 50.000000000000014
-
-
-
-![png](figures/output_9_1.png)
-
-
-Let us observe our _real_ data which happens to have true parameters $\mu=3$ and $\Sigma=2$
-
-
+where
+ - `regulariser` - boolean describing whether to plot the regularisation history
+ - `known_det_fisher` - value of the determinant of the target Fisher information if already known
+ - `figsize` - tuple with the size of the figure if not default
+ 
+### Estimate parameters
+Gaussian estimates of the parameter values can be obtained from the network by running
 ```python
-real_data = np.random.normal(3., np.sqrt(2.), size = (1,) + input_shape)
+imnn.get_estimate(input_data)
 ```
-
-
+where `input_data` is data input to the network (shape `None + input_shape`). Note that if you want to make estimates without initialising the IMNN (once trained), the model can be loaded, along with the saved data during fit. For an IMNN saved with `directory="model"` and `filename=model` then an estimator can be made using
 ```python
-fig, ax = plt.subplots(1, 1, figsize = (10, 6))
-ax.plot(real_data[0], label = "observed data")
-ax.legend(frameon = False)
-ax.set_xlim([0, 9])
-ax.set_xticks([])
-ax.set_ylabel("Data amplitude");
+estimator_parameters = np.load("model/model/estimator.npz")
+Finv = estimator_parameters["Finv"]
+θ_fid = estimator_parameters["θ_fid"]
+dμ_dθ = estimator_parameters["dμ_dθ"]
+Cinv = estimator_parameters["Cinv"]
+μ = estimator_parameters["μ"]
+
+@tf.function:
+def estimator(data):
+    return tf.add(
+        θ_fid,
+        tf.einsum(
+            "ij,jk,kl,ml->mi", 
+            Finv, 
+            dμ_dθ, 
+            Cinv,
+            model(data) - μ))
 ```
-
-
-![png](figures/output_12_0.png)
-
-
-The posterior distribution for this data (normalised to integrate to 1) is
-
-
+or
 ```python
-μ_array = np.linspace(-10, 10, 1000)
-Σ_array = np.linspace(0.001, 10, 1000)
-
-parameter_grid = np.array(np.meshgrid(μ_array, Σ_array, indexing = "ij"))
-dx = (μ_array[1] - μ_array[0]) * (Σ_array[1] - Σ_array[0])
-
-analytic_posterior = np.exp(-0.5 * (np.sum((real_data[0][:, np.newaxis] - parameter_grid[0, :, 0][np.newaxis, :])**2., axis = 0)[:, np.newaxis] / parameter_grid[1, 0, :][np.newaxis, :] + real_data.shape[1] * np.log(2. * np.pi * parameter_grid[1, 0, :][np.newaxis, :])))
-analytic_posterior = analytic_posterior.T / np.sum(analytic_posterior * dx)
+def estimator(data):
+    return θ_fid + np.einsum(
+        "ij,jk,kl,ml->mi", 
+        Finv, 
+        dμ_dθ, 
+        Cinv,
+        model(data) - μ)
 ```
 
-
+## Training and validation data format
+The data must have the correct shape. For a single simulation with shape `input_shape` then a fiducial data array must have a shape of
 ```python
-fig, ax = plt.subplots(2, 2, figsize = (16, 10))
-plt.subplots_adjust(wspace = 0, hspace = 0)
-ax[0, 0].plot(parameter_grid[0, :, 0], np.sum(analytic_posterior, axis = 0), linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[0, 0].legend(frameon = False)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_ylabel('$\\mathcal{P}(\\mu|{\\bf d})$')
-ax[0, 0].set_yticks([])
-ax[0, 0].set_xticks([])
-ax[1, 0].set_xlabel('$\mu$');
-ax[1, 0].set_ylim([0, 10])
-ax[1, 0].set_ylabel('$\Sigma$')
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].contour(parameter_grid[0, :, 0], parameter_grid[1, 0, :], analytic_posterior, colors = "C2")
-ax[1, 1].plot(np.sum(analytic_posterior, axis = 1), parameter_grid[1, 0, :], linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[1, 1].legend(frameon = False)
-ax[1, 1].set_ylim([0, 10])
-ax[1, 1].set_xlabel('$\\mathcal{P}(\\Sigma|{\\bf d})$')
-ax[1, 1].set_xticks([])
-ax[1, 1].set_yticks([])
-ax[0, 1].axis("off");
+fiducial.shape = (n_s,) + input_shape
 ```
-
-
-![png](figures/output_15_0.png)
-
-
-Now lets see how the information maximising neural network can recover this posterior.
-
-## Generate data
-
-We start by defining a function to generate the data with the correct shape. The shape must be
-```
-data_shape = (None,) + input_shape
-```
-
-It is useful to define the generating function so that it only takes in the value of the parameter as its input since the function can then be used for ABC later.<br><br>
-The data needs to be generated at a fiducial parameter value and at perturbed values just below and above the fiducial parameter for the numerical derivative.
-
-
+The derivatives need to have a shape of
 ```python
-δθ = np.array([0.1, 0.1])
+derivative.shape = (n_d, 2, n_params) + input_shape
 ```
+where `derivative[:, 0, ...]` is the lower part of the numerical derivative and `derivative[:, 1, ...]` is the upper part of the numerical derivative and `derivative[:, :, i, ...]` labels the `i`th parameter.
 
-The training and validation data should be generated at the perturbed values with shape
-```
-perturbed_data_shape = (None, 2, n_params) + input_shape
-```
-if using numerical derivatives, where `[:, 0, ...]` is the parameter at `Δθpm` below `θ_fid` and `[:, 1, ...]` is the parameter at `Δθpm` above `θ_fid`. This is done for each parameter keeping ever non-perturbed parameter at its fiducial parameter.
-
-If the true derivative of the simulations with respect to the parameters is available then this can be calculated for each fiducial simulation in the dataset with shape
-```
-derivative_data_shape = (None, n_params) + input_shape
-```
-
-The generating function is defined so that the fiducial parameter is passed as a list so that many simulations can be made at once. This is very useful for the ABC function later.
-
-
+If the data won't fit in memory then we can load data via a generative function
 ```python
-def simulator(θ, seed, simulator_args):
-    if seed is not None:
-        np.random.seed(seed)
-    if len(θ.shape) > 1:
-        μ = θ[:, 0]
-        Σ = θ[:, 1]
-    else:
-        μ = 0.
-        Σ = θ
-    return np.moveaxis(np.random.normal(μ, np.sqrt(Σ), simulator_args["input shape"] + (θ.shape[0],)), -1, 0)
+def fiducial_loader(seed):
+    yield fiducial[seed], seed
+
+def derivative_loader(seed, derivative, parameter):
+    yield derivative[seed, derivative, parameter] (seed, derivative, parameter)
 ```
+The function yields a single simulation at for each call labelled with the seed index (`seed` in range `0` to `n_s`) for the fiducial loader. The derivative loader yields a single simulation at a given seed, given upper or lower derivative and given parameter index (`seed` in range `0` to `n_d`, `derivative` in range `0` to `1`, and `parameter` in range `0` to `n_params`). In the above functions, `fiducial` and `derivative` are some way of grabbing the data - it could be reading from file or from memory, etc. This has quite a bit of overhead and so it would be preferred to save the data as a TFRecord format. Instructions on how to do this for ingestion by the IMNN is available in the `examples/TFRecords.ipynb` and `examples/IMNN - TFRecords.ipynb` tutorials.
 
-### Training data
-Enough data needs to be made to approximate the covariance matrix of the output summaries. The number of simulations needed to approximate the covariance is `n_s`. We can make stochastic updates by making `n_train` more simulations than are needed to approximate the covariance. `n_train` should be an integer number.
+## Network model and optimiser
 
-
-```python
-n_s = 1000
-n_train = 1
-seed = np.random.randint(1e6)
-```
-
-The training data can now be made
-
-
-```python
-d = simulator(θ = np.tile(θ_fid, [n_train * n_s, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-```
-
-Ideally we would be able to take the derivative of our simulations with respect to the model parameters. We can indeed do that in this case, but since this is possibly a rare occurance I will show an example where the derivatives are calculated numerically. By suppressing the sample variance between the simulations created at some lower and upper varied parameter values, far fewer simulations are needed. We should choose the extra `n_train` simulations for the stochastic updates to be the same as for the fiducial simulations.
-
-
-```python
-n_d = 1000
-```
-
-The sample variance is supressed by choosing the same initial seed when creating the upper and lower simulations.
-
-
-```python
-dd_m_dθ = simulator(θ = np.tile(θ_fid - np.array([0.1, 0.]), [n_train * n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-dd_p_dθ = simulator(θ = np.tile(θ_fid + np.array([0.1, 0.]), [n_train * n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-dd_m_dθ = np.stack([dd_m_dθ, simulator(θ = np.tile(θ_fid - np.array([0., 0.1]), [n_train * n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})], axis = 1)
-dd_p_dθ = np.stack([dd_p_dθ, simulator(θ = np.tile(θ_fid + np.array([0., 0.1]), [n_train * n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})], axis = 1)
-dd_dθ_num = np.concatenate([dd_m_dθ[:, np.newaxis, ...], dd_p_dθ[:, np.newaxis, ...]], axis=1)
-dd_dθ = (dd_p_dθ - dd_m_dθ) / (2. * δθ)[np.newaxis, :, np.newaxis]
-```
-
-### Test data
-We should also make some test data, but here we will use only one combination. This needs adding to the dictionary
-
-
-```python
-seed = np.random.randint(1e6)
-td = simulator(θ = np.tile(θ_fid, [n_s, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-tdd_m_dθ = simulator(θ = np.tile(θ_fid - np.array([0.1, 0.]), [n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-tdd_p_dθ = simulator(θ = np.tile(θ_fid + np.array([0.1, 0.]), [n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})
-tdd_m_dθ = np.stack([tdd_m_dθ, simulator(θ = np.tile(θ_fid - np.array([0., 0.1]), [n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})], axis = 1)
-tdd_p_dθ = np.stack([tdd_p_dθ, simulator(θ = np.tile(θ_fid + np.array([0., 0.1]), [n_d, 1]), seed = seed, simulator_args = {"input shape": input_shape})], axis = 1)
-tdd_dθ_num = np.concatenate([tdd_m_dθ[:, np.newaxis, ...], tdd_p_dθ[:, np.newaxis, ...]], axis=1)
-tdd_dθ = (tdd_p_dθ - tdd_m_dθ) / (2. * δθ)[np.newaxis, :, np.newaxis]
-```
-
-### Data visualisation
-We can plot the data to see what it looks like.
-
-
-```python
-fig, ax = plt.subplots(1, 1, figsize = (10, 6))
-ax.plot(d[np.random.randint(n_train * n_s)], label = "training data")
-ax.plot(td[np.random.randint(n_s)], label = "test data")
-ax.legend(frameon = False)
-ax.set_xlim([0, 9])
-ax.set_xticks([])
-ax.set_ylabel("Data amplitude");
-```
-
-
-![png](figures/output_33_0.png)
-
-
-It is also very useful to plot the upper and lower derivatives to check that the sample variance is actually supressed since the network learns extremely slowly if this isn't done properly.
-
-
-```python
-fig, ax = plt.subplots(2, 2, figsize = (20, 10))
-plt.subplots_adjust(hspace = 0)
-training_index = np.random.randint(n_train * n_d)
-test_index = np.random.randint(n_d)
-
-ax[0, 0].plot(dd_m_dθ[training_index, 0], label = "lower training data", color = "C0", linestyle = "dashed")
-ax[0, 0].plot(dd_p_dθ[training_index, 0], label = "upper training data", color = "C0")
-ax[0, 0].plot(tdd_m_dθ[test_index, 0], label = "lower validation data", color = "C1", linestyle = "dashed")
-ax[0, 0].plot(tdd_p_dθ[test_index, 0], label = "upper validation data", color = "C1")
-ax[0, 0].legend(frameon = False)
-ax[0, 0].set_xlim([0, 9])
-ax[0, 0].set_xticks([])
-ax[0, 0].set_ylabel("Data amplitude with varied mean")
-ax[1, 0].plot(dd_dθ[training_index, 0], label = "derivative training data", color = "C0")
-ax[1, 0].plot(tdd_dθ[test_index, 0], label = "derivative validation data", color = "C1")
-ax[1, 0].set_xlim([0, 9])
-ax[1, 0].set_xticks([])
-ax[1, 0].legend(frameon = False)
-ax[1, 0].set_ylabel("Amplitude of the derivative of the data\nwith respect to the mean");
-
-ax[0, 1].plot(dd_m_dθ[training_index, 1], label = "lower training data", color = "C0", linestyle = "dashed")
-ax[0, 1].plot(dd_p_dθ[training_index, 1], label = "upper training data", color = "C0")
-ax[0, 1].plot(tdd_m_dθ[test_index, 1], label = "lower validation data", color = "C1", linestyle = "dashed")
-ax[0, 1].plot(tdd_p_dθ[test_index, 1], label = "upper validation data", color = "C1")
-ax[0, 1].legend(frameon = False)
-ax[0, 1].set_xlim([0, 9])
-ax[0, 1].set_xticks([])
-ax[0, 1].set_ylabel("Data amplitude with varied covariance")
-ax[1, 1].plot(dd_dθ[training_index, 1], label = "derivative training data", color = "C0")
-ax[1, 1].plot(tdd_dθ[test_index, 1], label = "derivative validation data", color = "C1")
-ax[1, 1].set_xlim([0, 9])
-ax[1, 1].set_xticks([])
-ax[1, 1].legend(frameon = False)
-ax[1, 1].set_ylabel("Amplitude of the derivative of the data\nwith respect to covariance");
-```
-
-
-![png](figures/output_35_0.png)
-
-
-## Initiliase the neural network
-
-We will choose a fairly generic network as an example here. These networks can be written in TensorFlow or keras. It must be able to take in `(None,) + input_shape` and `(None, n_params) + input_shape` or `(None, 2, n_params) + input_shape` and output a flat array with `n_summaries` outputs, i.e. `(None, n_summaries` and `(None, n_params, n_summaries)` or `(None, 2, n_params, n_summaries)`.
-
-In principle `n_summaries` can be any number, but information loss is guaranteed if `n_summaries < n_params` and we overparameterise the summaries if we use `n_summaries>n_params`. Therefore, in principle, we should use `n_summaries=n_params`. Note that this isn't necessarily true if external informative summaries are included in the training.
-
-
-```python
-n_summaries = n_params
-```
-
-In keras we shall define a network with two hidden layers with 128 hidden nodes in each and every layer apart from the output activated using `LeakyReLU`. Since the vectorised conversion for `LeakyReLU` has not yet been defined in `keras` or `TensorFlow` we can define it as a custom `keras` layer.
-
-
-```python
-class LeakyReLU(tf.keras.layers.Layer):
-    def __init__(self, α, **kwargs):
-        self.α = α
-        super(LeakyReLU, self).__init__(**kwargs)
-    def build(self, input_shape):
-        super(LeakyReLU, self).build(input_shape)
-    def call(self, x):
-        return tf.where(tf.greater(x, 0) , x=x, y=tf.multiply(self.α, x))
-    def compute_output_shape(self, input_shape):
-        return input_shape
-```
-
-We shall optimise the network using the `Adam` optimiser on its default settings
-
-
+The IMNN is based on `keras`-like network and optimisers, so an example could be
 ```python
 model = tf.keras.Sequential(
     [tf.keras.Input(shape=input_shape),
@@ -365,502 +208,237 @@ model = tf.keras.Sequential(
     ])
 opt = tf.keras.optimizers.Adam()
 ```
+Make sure to choose this network sensibly so that it best pulls the information from the data.
 
-## Initialise the IMNN module
+# LFI
+_______
 
-The IMNN only needs to be provided with the number of parameters in the model, the number of summaries output by the network and the number of simulations needed to approximate the covariance of the summaries and to approximate the mean of the derivative of the summaries with respect to the parameters. Optionally we can also choose whether to use 32 or 64 bit floats (and ints) in TensorFlow and choose whether or not to get verbose size checking whilst loading the model and the data. Depending on the size of the dataset (and network) that is being used, either all of the data can be passed through the network by using the default setting of `fast_train=True` or it can be vectorised looped through by setting `fast_train=False`.
+The LFI module provides a Gaussian approximation to the posterior, a simple approximation Bayesian computation (ABC) implementation and a population Monte Carlo (PMC). These work with any estimator and not just with the IMNN.
 
-
-```python
-imnn = IMNN.IMNN(n_params=n_params, n_summaries=n_summaries, n_covariance_sims=n_s, n_derivative_sims=n_d, fast_train=True, dtype=tf.float32, verbose=True, save=True)
-```
-
-    Using single dataset
-
-
-We can choose to save the keras model by passing `save=True` on initialisation. A directory to save the model can also be passed using `filename=directory`. If `save=True` and no filename is given then the directory will be set to `./model`.
-
-The network is then passed to the module using
-
+## Gaussian approximation of the posterior
+The Gaussian approximation takes the inverse Fisher information as the variance of a Gaussian posterior (as implied by the Cramer-Rao bound) whose mean is at the estimate value.
 
 ```python
-imnn.set_model(model=model, optimiser=opt)
+GA = LFI.GaussianApproximation(
+    target_data, prior, Fisher, get_estimate, {labels})
 ```
+where
+ - `target_data` - as many pieces of data to be inferred (target_data.shape = (None,) + input_shape
+ - `prior` - the prior distribution which can be sampled from and whose probability can be evaluated with an `event_shape` of at least `[1]` (suggested to use a TensorFlow Probability distribution)
+ - `Fisher` - Fisher information matrix (`imnn.F` or otherwise for non-IMNN)
+ - `get_estimate` - function providing estimate of the `n_params` model parameters from the data (`imnn.get_estimate` or otherwise for non-IMNN)
+ - `labels` - list of strings for labelling plots
 
-    Checking is not currently done on the model. Make sure that its output has shape (None, 2) for the fiducial values a nd (None, 2, 2, 2) for the derivative values.
-    WARNING:tensorflow:From /home/charnock/envs/tensorflow-2.0.0/lib/python3.7/site-packages/tensorflow_core/python/ops/resource_variable_ops.py:1781: calling BaseResourceVariable.__init__ (from tensorflow.python.ops.resource_variable_ops) with constraint is deprecated and will be removed in a future version.
-    Instructions for updating:
-    If using Keras pass *_constraint arguments to layers.
-    INFO:tensorflow:Assets written to: model/assets
-
-
-At any point the model can be saved by simply running `imnn.save_model(imnn.filename)`. To reload the model the optimiser needs to be recreated, but the model and weights can be recoverd using
+### Plot Fisher information
+The inverse Fisher information can plotted using
 ```python
-imnn.load_model(optimiser=opt, weights=None)
+GA.plot_Fisher({figsize})
 ```
-If a different set of weights are saved than when the model was last saved, the `.h5` file can be passed to the function - this `.h5` file must be in the model save directory (`imnn.filename`). For weights saved in `imnn.filename + "/model_weights.h5"` we can run
+### Gaussian approximation to the likelihood and posterior
+The Gaussian approximation to the likelihood (`prob`) and the posterior (and their logarithms) can be obtained using
 ```python
-imnn.load_model(optimiser=opt, weights="model_weights")
+GA.log_prob({grid}, {gridsize})
+GA.prob({grid}, {gridsize})
+GA.log_posterior({grid}, {gridsize})
+GA.posterior({grid}, {gridsize})
 ```
+where
+ - `grid` - a set of parameters or an array of parameter or a meshgrid of parameter to evaluate the likelihood or posterior at (if `None` gridsize takes over)
+ - `gridsize` - a tuple of length `n_params` with the size of the meshgrid to make #TODO might crash if `GA.prior.low=-np.inf` for any parameter or `GA.prior.high=np.inf` for any parameter. This defaults to `20` for every parameter if `grid=None` and `gridsize` is not provided
 
-## Load the data
-
-The data is passed as a TensorFlow data set for extremely quick and efficient transfer to GPUs, etc. For most reasonable sized datasets (GPU/CPU memory dependent of course) we can load this using
-
-
+### Plotting posterior
+The posterior can be plotted using
 ```python
-imnn.setup_dataset(θ_fid=θ_fid, d=d, dd_dθ=dd_dθ_num, δθ=δθ, external_summaries=None, external_derivatives=None)
+GA.plot({grid}, {gridsize}, **kwargs)
 ```
+where `**kwargs` are a variety of `matplotlib` arguments.
 
-Since we might already know some very informative summaries of the data, we can include these. To do so the external summaries can be passed to the above function as numpy arrays. The summaries must have the same structure as the data (and aligned with the data) where `input_shape` is replaced with a flat array with `n_external` elements.
+## Approximate Bayesian computation (ABC)
 
-The dataset can be setup externally by setting the data attributes
+The ABC draws parameter values from the prior and makes simulations at these points. These simulations are then summarised and then the distance between these estimates and the estimate of the target data can be calculated. Estimates within some small ϵ-ball around the target estimate are approximately samples from the posterior. Note that the larger the value of ϵ, the worse the approximation to the posterior. 
+
+Note that a simulator of the data is needed. The simulator must be a function
 ```python
-imnn.dataset = tf.data.Dataset.from_tensor_slices(data)
-imnn.dataset = imnn.dataset.batch(imnn.n_s)
-imnn.dataset = imnn.dataset.shuffle(n_train * imnn.n_s)
+def simulator(parameters, seed, simulator_args):
+    return simulation
 ```
-where `data=(fiducial_data, derivative_data)` is a tuple containing the fiducial and the derivative simulations. If the number of parameters for the mean of the derivatives is different to the number needed for the covariance then `data` should not be a tuple and instead just contain the fiducial simulations and instead the derivatives can be passed as
+where `seed` is a random number generator and `simulator_args` is a dict of arguments. The `seed` and `simulator_args` are only for setting up the simulator - the function used in the ABC (and PMC) call must only take an array of parameters and return an array of simulations made at those parameter values. The function can call external codes, submit jobs on a cluster, etc. as long as the simulations are returned in the same order as the passed parameter array.
+
+The ABC can be initialised using
 ```python
-imnn.derivative_dataset = tf.data.Dataset.from_tensor_slices(derivative_data)
-imnn.dataset = imnn.dataset.batch(imnn.n_d)
-imnn.dataset = imnn.dataset.shuffle(n_train * imnn.n_d)
+ABC = LFI.ApproximateBayesianComputation(
+    target_data, prior, Fisher, get_estimate, simulator, {labels})
 ```
-If the derivative is done numerically then `imnn.numerical=True` must be set, and likewise `imnn.numerical=False` must be used otherwise. The fiducial parameters should be set using
+where
+ - `target_data` - as many pieces of data to be inferred (target_data.shape = (None,) + input_shape
+ - `prior` - the prior distribution which can be sampled from and whose probability can be evaluated with an `event_shape` of at least `[1]` (suggested to use a TensorFlow Probability distribution)
+ - `Fisher` - Fisher information matrix (`imnn.F` or otherwise for non-IMNN)
+ - `get_estimate` - function providing estimate of the `n_params` model parameters from the data (`imnn.get_estimate` or otherwise for non-IMNN)
+ - `simulator` - function taking array of parameter values and returning simulations made at those values
+ - `labels` - list of strings for labelling plots
+ 
+### Obtaining samples
+The ABC can be run using
 ```python
-imnn.θ_fid = tf.Variable(θ_fid, dtype=imnn.dtype)
+ABC(draws, {at_once}, {save_sims})
 ```
-and if using the numerical derivative we also need to set
+or
 ```python
-imnn.δθ = tf.Variable(1. / (2. * δθ), dtype=imnn.dtype)
+ABC.ABC(draws, {at_once}, {save_sims}, {PMC}, {update})
 ```
-If external informative summaries are going to be used then the when the number of simulations for the derivative of the mean of the summaries and the number of simulations for the covariance of the summaries is the same the data tuple should be `data=(fiducial_data, derivative_data, external_summaries, external_derivatives)` and when then number is different the tuples should be different `data=(fiducial_data, external_summaries`) and `derivatives=(derivative_data, external_derivatives)`.
+where
+ - `draws` - the number of simulations to make (or parameter values to make the simulations if `PMC=True`) 
+ - `at_once` - boolean describing whether to process (and make) all simulations at once or not
+ - `save_sims` - string with the filename to save the sims (as a `.npy`) if provided
+ - `PMC` - boolean describing whether `draws` is a number of simulations or `draws` is an array of parameter values to make simulations at
+ - `update` - boolean describing whether to update the ABC attributes onces the ABC is run or not
+Once this is run the parameters, estimates, differences from the estimate and the target and the distance from the target are found as
+ - `ABC.parameters`
+ - `ABC.estimates`
+ - `ABC.differences`
+ - `ABC.distances`
 
-Although there is little point in doing the above externally, this could be extremely useful for large datasets which are written as TFRecords.
-
-The validation data can be passed using
-
-
+### Acception and rejection of samples
+`ABC` only runs the simulations and calculates the estimate distances but doesn't do the accept and reject step within the ϵ-ball. This is done using
 ```python
-imnn.setup_dataset(θ_fid=θ_fid, d=td, dd_dθ=tdd_dθ_num, δθ=δθ, external_summaries=None, external_derivatives=None, train=False)
+ABC.accept_reject(ϵ)
 ```
+where
+ - `ϵ` - a float describing the radius of the ϵ-ball
+Once this is run more attributes are filled
+ - `ABC.num_accepted` - number of accepted samples
+ - `ABC.num_rejected` - number of rejected samples
+ - `ABC.num_draws` - total number of samples done
+ - `ABC.accepted_parameters`
+ - `ABC.accepted_differences`
+ - `ABC.accepted_estimates`
+ - `ABC.accepted_distances`
+ - `ABC.rejected_parameters`
+ - `ABC.rejected_differences`
+ - `ABC.rejected_estimates`
+ - `ABC.rejected_distances`
 
-The same external setup can be be performed exactly as above but with `test_` appended before each attribute name.
-
-## Train the network
-
-Since we need to constrain the scale of the summaries (remember, every linear rescaling of a summary is also a summary) we choose to constrain the summaries to have a covariance close to the identity matrix. This makes the summaries somewhat (and ideally exactly) orthogonal. To enforce this scale we have a regulariser which is the Frobenius norm of the difference between the covariance matrix and the identity matrix and also the difference betwee the inverse covariance matrix and the identity matrix. How close the covariance gets to the identity is controlled by a strength `λ` parameter and a closeness `ϵ` parameter. These determine a rate of convergence α which determines how sharp the loss function is (if it's too sharp then training can be unstable). We choose an `ϵ=0.01` and a strength of `λ=10`
-
-
+### Automatic rejection sampler
+To get a certain number of draws within a chosen ϵ-ball one can run
 ```python
-imnn.set_regularisation_strength(ϵ=0.01, λ=10.)
+ABC.get_min_accepted(
+    ϵ, accepted, {min_draws}, {at_once}, {save_sims}, {tqdm_notebook})
 ```
+where
+ - `ϵ` - a float describing the radius of the ϵ-ball
+ - `accepted` - the number of samples to be accepted within the ϵ-ball
+ - `min_draws` - how many simulations to do at a time iteratively until enough simulations are accepted
+ - `at_once` - boolean describing whether to process (and make) all simulations at once or not
+ - `save_sims` - string with the filename to save the sims (as a `.npy`) if provided
+ - `tqdm_notebook` - True if using a Jupyter notebook and False otherwise #TODO - make automatic (might already be implemented)
 
-We can now train the network. We just need to choose a number iterations of training updates (equivalent to full passes through the dataset). To validate we just pass the `validate=True` option.
-
-
+### Histogrammed posterior
+The posterior is approximated by histogramming the accepted samples from the ABC (and acception/rejection) and can be calculated using
 ```python
-imnn.fit(n_iterations=None, validate=True, patience=50, checkpoint=50, min_iterations=500)
+ABC.posterior(
+    {bins}, {ranges}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook})
 ```
+where
+ - `bins` - number of bins in the histogram defining the posterior
+ - `ranges` - minimum and maximum values for each parameter in the histogram
+Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, and/or `ABC.get_min_accepted(...)` can be passed to `ABC.posterior(...)` to run the ABC when calling posterior rather than calling the sampling step first.
 
-    Using patience length of 50. Maximum number of training iterations is 10000000000.
-    Saving current model in model
-    INFO:tensorflow:Assets written to: model/assets
-
-
-
-    HBox(children=(IntProgress(value=0, description='Iterations', max=10000000000, style=ProgressStyle(description…
-
-
-    WARNING:tensorflow:Layer dense is casting an input tensor from dtype float64 to the layer's dtype of float32, which is new behavior in TensorFlow 2.  The layer has dtype float32 because it's dtype defaults to floatx.
-
-    If you intended to run this layer in float32, you can safely ignore this warning. If in doubt, this warning is likely only an issue if you are porting a TensorFlow 1.X model to TensorFlow 2.
-
-    To change all layers to have dtype float64 by default, call `tf.keras.backend.set_floatx('float64')`. To change just this layer, pass dtype='float64' to the layer constructor. If you are the author of this layer, you can disable autocasting by passing autocast=False to the base Layer constructor.
-
-    Reached 50 steps without increasing val_det_F. Resetting weights to those from iteration 6350.
-
-
-Training can be continued simply by running the fit again.
-
-The network can also be reinitialised before training if something goes awry by running
+### Plot plosterior
+The posterior can be plotted using
 ```python
-n.fit(n_iterations=1000, validate=True, reset=True)
+ABC.plot(
+    {smoothing}, {bins}, {ranges}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
-
-Note that it is normal for the network to initially run slow and quite quickly speed up as the data flow from the dataset to the CPU is properly filled.
-
-Early stopping on the increase of the Fisher information can be performed by using `patience = x` where `x` should be an integer number of steps of allowed buffer for the Fisher information to descrease before breaking. When using patience, `n_iterations = None` can be passed so that the training keeps on running for some very large number of iterations, otherwise `n_iterations` acts as the maximum number of iterations. Since there is a constraint on the covariance, there is often a period at the beginning of training where the Fisher information may reduce, for that reason a `min_iterations` argument is provided. The patience early stopping only begins after `min_iterations` number of iterations. When validation data is being used the early stopping defaults to the Fisher information of the validation data.
-
-Without being set, the weights are saved on every training epoch, but this will be very costly in terms of training time. It is therefore advised to use `checkpoint` at some larger number. For example, `checkpoint = 100` will only save the model weights every 100 iterations. Note that the last possible model which can be reverted to will be then be at maximum 100 iterations before. `checkpoint` can be used without patience to save the weights of the model, which could be useful for very long runs.
-
-A history (imnn.history) dictionary is collecting diagnostics. It contains
-- `det_F` : determinant of the Fisher information
-- `det_C` : determinant of the covariance of the summaries
-- `det_Cinv` : determinant of the inverse covariance of the summaries
-- `det_dμ_dθ` : derivative of the mean of the summaries with respect to the parameters
-- `reg` : value of the regulariser
-- `r` : value of the regulariser strength
-
-and the same for the validation set
-
-- `val_det_F` : determinant of the Fisher information for the validation set
-- `val_det_C` : determinant of the covariance of the summaries from the validation set
-- `val_det_Cinv` : determinant of the inverse covariance of the summaries from the validation set
-- `val_det_dμ_dθ` : derivative of the mean of the summaries from the validation set with respect to the parameters
-- `val_reg` : value of the regulariser for the validation set
-- `val_r` : value of the regulariser strength for the validation set
-
-
-```python
-fig, ax = plt.subplots(4, 1, sharex = True, figsize = (10, 20))
-plt.subplots_adjust(hspace = 0)
-epochs = np.arange(1, len(imnn.history["det_F"]) + 1)
-ax[0].plot(epochs, imnn.history["det_F"], color="C0",
-           label=r'$|{\bf F}_{\alpha\beta}|$ from training data')
-ax[0].plot(epochs, imnn.history["val_det_F"], color="C1",
-           label=r'$|{\bf F}_{\alpha\beta}|$ from validation data')
-ax[0].axhline(determinant_exact_fisher, color="black", linestyle="dashed")
-ax[0].legend(frameon=False)
-ax[0].set_xlim([1, epochs[-1]])
-ax[0].set_ylabel(r"$|{\bf F}_{\alpha\beta}|$")
-ax[1].plot(epochs, imnn.history["det_C"], color="C0",
-           label=r'$|{\bf C}|$ from training data')
-ax[1].plot(epochs, imnn.history["val_det_C"], color="C1",
-           label=r'$|{\bf C}|$ from validation data')
-ax[1].plot(epochs, imnn.history["det_Cinv"], color="C0", linestyle="dashed",
-           label=r'$|{\bf C}^{-1}|$ from training data')
-ax[1].plot(epochs, imnn.history["val_det_Cinv"], color="C1", linestyle="dashed",
-           label=r'$|{\bf C}^{-1}|$ from validation data')
-ax[1].axhline(1., color="black", linestyle="dashed")
-ax[1].legend(frameon=False, loc="best")
-ax[1].set_ylabel(r"$|{\bf C}|$ and $|{\bf C}^{-1}|$")
-ax[1].set_xlim([1, epochs[-1]])
-ax[1].set_yscale("log")
-ax[2].plot(epochs, imnn.history["reg"],
-           label=r'$\Lambda_2$ from training data')
-ax[2].plot(epochs, imnn.history["val_reg"],
-           label=r'$\Lambda_2$ from validation data')
-ax[2].legend(frameon=False)
-ax[2].set_ylabel(r"$\Lambda_2$")
-ax[2].set_xlim([1, epochs[-1]])
-ax[3].plot(epochs, imnn.history["r"],
-           label=r'$r$ from training data')
-ax[3].plot(epochs, imnn.history["val_r"],
-           label=r'$r$ from validation data')
-ax[3].legend(frameon=False)
-ax[3].set_ylabel(r"$r$")
-ax[3].set_xlim([1, epochs[-1]])
-ax[3].set_xlabel("Number of epochs");
-```
-
-
-![png](figures/output_63_0.png)
-
-
-## Maximum likelihood estimates
-
-The IMNN can provide maximum likelihood estimates of model parameters by initialising
-
-
-```python
-imnn.setup_MLE()
-```
-
-Note this only works when a validation set is already loaded. It uses the validation set to calculate the Fisher information, covariance, derivative of the mean summaries and therefore the compression and transformation into MLE space. If a different dataset is to be used then it can be provided by setting `dataset=False` and providing all the necessary extra data
-```python
-imnn.setup_MLE(dataset=True, θ_fid=None, d=None, dd_dθ=None, δθ=None, s=None, ds_dθ=None)
-```
-
-The maxmimum likelihood estimate is then obtained by running `imnn.get_MLE(d)` on data `d`
-
-
-```python
-print("The maximum likelihood estimate of the real data is " + str(imnn.get_MLE(real_data)[0].numpy()))
-```
-
-    The maximum likelihood estimate of the real data is [1.9187517 3.89256  ]
-
-
-## Approximate Bayesian computation
-
-We can now do ABC (or PMC-ABC) with our calculated summary. From the samples we create simulations at each parameter value and feed each simulation through the network to get summaries. The summaries are compared to the summary of the real data to find the distances which can be used to accept or reject points.
-
-We start by defining our prior as a truncated Gaussian (uniform is also available). The uniform function is taken from delfi by Justin Alsing. At some point in the near future (for a given value of "near") this whole module will upgraded to TensorFlow Probability and complete TensorFlow 2 implementation.
-
-We are going to choose the mean value of the variance to be 1 with a variance of the variance of 10 cut at 0 and 10.
-
-
-```python
-prior = priors.TruncatedGaussian(np.array([0., 1.]), np.array([[10., 0.], [0., 10.]]), np.array([-10., 0.]), np.array([10., 10.]))
-```
-
-The ABC module takes in the _observed_ data, the prior and the function for obtaining the MLE from the IMNN as well as the Fisher information matrix used for obtaining the MLE. It also takes in the simulator and its arguments.
-
-
-```python
-abc = ABC.ABC(real_data=real_data, prior=prior, F=imnn.MLE_F, get_MLE=imnn.get_MLE, simulator=simulator, seed=None, simulator_args={"input shape": input_shape})
-```
-
-## Gaussian approximation
-Before running all the simulations need for approximate Bayesian computation, we can get the Gaussian approximation of the posterior from the MLE and the inverse Fisher information.
-
-
-```python
-print("maximum likelihood estimate", abc.MLE[0])
-print("determinant of the Fisher information", np.linalg.det(abc.F))
-plt.imshow(np.linalg.inv(abc.Finv))
-plt.title("Inverse Fisher matrix")
-plt.xticks([0, 1], [r"$\mu$", r"$\Sigma$"])
-plt.yticks([0, 1], [r"$\mu$", r"$\Sigma$"])
-plt.colorbar();
-```
-
-    maximum likelihood estimate [1.9187517 3.89256  ]
-    determinant of the Fisher information 55.84487
-
-
-
-![png](figures/output_73_1.png)
-
-
-
-```python
-gaussian_approximation, grid = abc.gaussian_approximation(gridsize = 100)
-```
-
-
-```python
-fig, ax = plt.subplots(2, 2, figsize = (16, 10))
-plt.subplots_adjust(wspace = 0, hspace = 0)
-ax[0, 0].plot(parameter_grid[0, :, 0], np.sum(analytic_posterior * (parameter_grid[0, 1, 0] - parameter_grid[0, 0, 0]), axis = 0), linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[0, 0].plot(grid[0, :, 0], np.sum(gaussian_approximation * (grid[0, 1, 0] - grid[0, 0, 0]), axis = 0), color = "C1", label = "Gaussian approximation")
-ax[0, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[0, 0].legend(frameon = False)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_ylabel('$\\mathcal{P}(\\mu|{\\bf d})$')
-ax[0, 0].set_yticks([])
-ax[0, 0].set_xticks([])
-ax[1, 0].set_xlabel('$\mu$');
-ax[1, 0].set_ylim([0, 10])
-ax[1, 0].set_ylabel('$\Sigma$')
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].contour(parameter_grid[0, :, 0], parameter_grid[1, 0, :], analytic_posterior, colors = "C2")
-ax[1, 0].contour(grid[0, :, 0], grid[1, 0, :], gaussian_approximation, colors = "C1")
-ax[1, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[1, 0].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].plot(np.sum(analytic_posterior * (parameter_grid[1, 0, 1] - parameter_grid[1, 0, 0]), axis = 1), parameter_grid[1, 0, :], linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[1, 1].plot(np.sum(gaussian_approximation * (grid[1, 0, 1] - grid[1, 0, 0]), axis = 1), grid[1, 0, :], color = "C1", label = "Gaussian approximation")
-ax[1, 1].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].legend(frameon = False)
-ax[1, 1].set_ylim([0, 10])
-ax[1, 1].set_xlabel('$\\mathcal{P}(\\Sigma|{\\bf d})$')
-ax[1, 1].set_xticks([])
-ax[1, 1].set_yticks([])
-ax[0, 1].axis("off");
-```
-
-
-![png](figures/output_75_0.png)
-
-
-We can see that the maximum likelihood estimate for the mean is almost perfect whilst it is incorrect for the variance. However, we can now see the ABC does in its place.
-
-### ABC
-The most simple ABC takes the number of draws and a switch to state whether to run all the simulations in parallel or sequentially. The full simulations can also be saved by passing a file name. The draws are stored in the class attribute `ABC_dict`.
-
-
-```python
-abc.ABC(draws=100000, at_once=True, save_sims=None)
-```
-
-In ABC, draws are accepted if the distance between the simulation summary and the simulation of the real data are "close", i.e. smaller than some ϵ value, which is chosen somewhat arbitrarily.
-
-
-```python
-ϵ = .5
-accept_indices = np.argwhere(abc.ABC_dict["distances"] < ϵ)[:, 0]
-reject_indices = np.argwhere(abc.ABC_dict["distances"] >= ϵ)[:, 0]
-print("Number of accepted samples = ", accept_indices.shape[0])
-```
-
-    Number of accepted samples =  636
-
+where 
+ - `smoothing` - the pixel range of a Gaussian smoothing of the histogram for plotting (smoothing causes inflation of the posterior)
+Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, and/or `ABC.get_min_accepted(...)` can be passed to `ABC.plot(...)` to run the ABC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
 ### Plot samples
-We can plot the output samples and the histogram of the accepted samples, which should peak around `θ = 1` (where we generated the real data). The monotonic function of all the output samples shows that the network has learned how to summarise the data.
-
-
+The samples can also be plotted using
 ```python
-fig, ax = plt.subplots(2, 2, figsize = (14, 10))
-plt.subplots_adjust(hspace = 0, wspace = 0.2)
-ax[0, 0].scatter(abc.ABC_dict["parameters"][reject_indices, 0], abc.ABC_dict["MLE"][reject_indices, 0], s = 1, alpha = 0.1, label = "Rejected samples", color = "C3")
-ax[0, 0].scatter(abc.ABC_dict["parameters"][accept_indices, 0] , abc.ABC_dict["MLE"][accept_indices, 0], s = 1, label = "Accepted samples", color = "C6", alpha = 0.5)
-ax[0, 0].axhline(abc.MLE[0, 0], color = 'black', linestyle = 'dashed', label = "$\hat{\mu}_{obs}$")
-ax[0, 0].legend(frameon=False)
-ax[0, 0].set_ylabel('$\hat{\mu}$', labelpad = 0)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_xticks([])
-ax[1, 0].scatter(abc.ABC_dict["parameters"][reject_indices, 0], abc.ABC_dict["MLE"][reject_indices, 1], s = 1, alpha = 0.1, label = "Rejected samples", color = "C3")
-ax[1, 0].scatter(abc.ABC_dict["parameters"][accept_indices, 0] , abc.ABC_dict["MLE"][accept_indices, 1], s = 1, label = "Accepted samples", color = "C6", alpha = 0.5)
-ax[1, 0].axhline(abc.MLE[0, 1], color = 'black', linestyle = 'dashed', label = "$\hat{\Sigma}_{obs}$")
-ax[1, 0].legend(frameon=False)
-ax[1, 0].set_ylabel('$\hat{\Sigma}$', labelpad = 0)
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].set_xlabel("$\mu$")
-ax[0, 1].scatter(abc.ABC_dict["parameters"][reject_indices, 1], abc.ABC_dict["MLE"][reject_indices, 0], s = 1, alpha = 0.1, label = "Rejected samples", color = "C3")
-ax[0, 1].scatter(abc.ABC_dict["parameters"][accept_indices, 1] , abc.ABC_dict["MLE"][accept_indices, 0], s = 1, label = "Accepted samples", color = "C6", alpha = 0.5)
-ax[0, 1].axhline(abc.MLE[0, 0], color = 'black', linestyle = 'dashed', label = "$\hat{\mu}_{obs}$")
-ax[0, 1].legend(frameon=False)
-ax[0, 1].set_ylabel('$\hat{\mu}$', labelpad = 0)
-ax[0, 1].set_xlim([0, 10])
-ax[0, 1].set_xticks([])
-ax[1, 1].scatter(abc.ABC_dict["parameters"][reject_indices, 1], abc.ABC_dict["MLE"][reject_indices, 1], s = 1, alpha = 0.1, label = "Rejected samples", color = "C3")
-ax[1, 1].scatter(abc.ABC_dict["parameters"][accept_indices, 1] , abc.ABC_dict["MLE"][accept_indices, 1], s = 1, label = "Accepted samples", color = "C6", alpha = 0.5)
-ax[1, 1].axhline(abc.MLE[0, 1], color = 'black', linestyle = 'dashed', label = "$\hat{\Sigma}_{obs}$")
-ax[1, 1].legend(frameon=False)
-ax[1, 1].set_ylabel('$\hat{\Sigma}$', labelpad = 0)
-ax[1, 1].set_xlim([0, 10])
-ax[1, 1].set_xlabel("$\Sigma$");
+ABC.scatter_plot(
+    {axes}, {rejected}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
+where 
+ - `axes` - either `"parameter_estimate"`, `"parameter_parameter"`, or `"estimate_estimate"` for plotting the estimates against the parameters, or the parameters against the parameters or the estimates against the estimates (the last two are good for diagnostics such as the completeness of the sampling from the prior and the shape and correlation of the estimation function)
+ - `rejected` - a number between `0` and `1` describing the fraction of the rejected samples to plot (there are often orders of magnitude more samples rejected and so it makes sense to plot fewer, if they are to be plotted at all)
+Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, and/or `ABC.get_min_accepted(...)` can be passed to `ABC.scatter_plot(...)` to run the ABC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
+## Population Monte Carlo (PMC)
 
-![png](figures/output_82_0.png)
+Whilst we can obtain approximate posteriors using ABC, the rejection rate is very high because we sample always from the prior. Population Monte Carlo (PMC) uses statistics of the population of samples to propose new parameter values, so each new simulation is more likely to be accepted. This prevents us needing to define an ϵ parameter to define the acceptance distance. Instead we start with a population from the prior and iteratively move samples inwards. Once it becomes difficult to move the population any more, i.e. the number of attempts to accept a parameter becomes very large, then the distribution is seen to be a stable approximation to the posterior.
 
-
-
+The whole module works very similarly to `ABC` with a few changes in arguments.
 ```python
-fig, ax = plt.subplots(2, 2, figsize = (16, 10))
-plt.subplots_adjust(wspace = 0, hspace = 0)
-ax[0, 0].plot(parameter_grid[0, :, 0], np.sum(analytic_posterior * (parameter_grid[0, 1, 0] - parameter_grid[0, 0, 0]), axis = 0), linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[0, 0].plot(grid[0, :, 0], np.sum(gaussian_approximation * (grid[0, 1, 0] - grid[0, 0, 0]), axis = 0), color = "C1", label = "Gaussian approximation")
-ax[0, 0].hist(abc.ABC_dict["parameters"][accept_indices, 0], np.linspace(-10, 10, 100), histtype = u'step', density = True, linewidth = 1.5, color = "C6", label = "ABC posterior");
-ax[0, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[0, 0].legend(frameon = False)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_ylabel('$\\mathcal{P}(\\mu|{\\bf d})$')
-ax[0, 0].set_yticks([])
-ax[0, 0].set_xticks([])
-ax[1, 0].set_xlabel('$\mu$');
-ax[1, 0].set_ylim([0, 10])
-ax[1, 0].set_ylabel('$\Sigma$')
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].scatter(abc.ABC_dict["parameters"][accept_indices, 0], abc.ABC_dict["parameters"][accept_indices, 1], color = "C6", s = 1, alpha = 0.5)
-ax[1, 0].scatter(abc.ABC_dict["parameters"][reject_indices, 0], abc.ABC_dict["parameters"][reject_indices, 1], color = "C3", s = 1, alpha = 0.01)
-ax[1, 0].contour(parameter_grid[0, :, 0], parameter_grid[1, 0, :], analytic_posterior, colors = "C2")
-ax[1, 0].contour(grid[0, :, 0], grid[1, 0, :], gaussian_approximation, colors = "C1")
-ax[1, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[1, 0].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].hist(abc.ABC_dict["parameters"][accept_indices, 1], np.linspace(0, 10, 100), histtype = u'step', orientation="horizontal", density = True, linewidth = 1.5, color = "C6", label = "ABC posterior");
-ax[1, 1].plot(np.sum(analytic_posterior * (parameter_grid[1, 0, 1] - parameter_grid[1, 0, 0]), axis = 1), parameter_grid[1, 0, :], linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[1, 1].plot(np.sum(gaussian_approximation * (grid[1, 0, 1] - grid[1, 0, 0]), axis = 1), grid[1, 0, :], color = "C1", label = "Gaussian approximation")
-ax[1, 1].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].legend(frameon = False)
-ax[1, 1].set_ylim([0, 10])
-ax[1, 1].set_xlabel('$\\mathcal{P}(\\Sigma|{\\bf d})$')
-ax[1, 1].set_xticks([])
-ax[1, 1].set_yticks([])
-ax[0, 1].axis("off");
+PMC = LFI.PopulationMonteCarlo(
+    target_data, prior, Fisher, get_estimate, simulator, {labels})
 ```
-
-
-![png](figures/output_83_0.png)
-
-
-We now get samples from the posterior disrtibution which is not too far from the analytic posterior, and is at least unbiased. However, many samples are rejected to achieve this, and the rejection is defined somewhat arbitrarily, making it very computationally heavy and uncertain. We can improve on this using a PMC.
-
-## PMC-ABC
-Population Monte Carlo ABC is a way of reducing the number of draws by first sampling from a prior, accepting the closest 75% of the samples and weighting all the rest of the samples to create a new proposal distribution. The furthest 25% of the original samples are redrawn from the new proposal distribution. The furthest 25% of the simulation summaries are continually rejected and the proposal distribution updated until the number of draws needed accept all the 25% of the samples is much greater than this number of samples. This ratio is called the criterion.
-
-If we want 1000 samples from the approximate distribution at the end of the PMC we need to set `posterior = 1000`. The initial random draw (as in ABC above) initialises with `draws`, the larger this is the better proposal distribution will be on the first iteration.
-
-The `PMC` can be continued by running again with a smaller criterion.
-
-
+where
+ - `target_data` - as many pieces of data to be inferred (target_data.shape = (None,) + input_shape
+ - `prior` - the prior distribution which can be sampled from and whose probability can be evaluated with an `event_shape` of at least `[1]` (suggested to use a TensorFlow Probability distribution)
+ - `Fisher` - Fisher information matrix (`imnn.F` or otherwise for non-IMNN)
+ - `get_estimate` - function providing estimate of the `n_params` model parameters from the data (`imnn.get_estimate` or otherwise for non-IMNN)
+ - `simulator` - function taking array of parameter values and returning simulations made at those values
+ - `labels` - list of strings for labelling plots
+ 
+### Obtaining accepted samples
+The PMC can be run by calling 
 ```python
-abc.PMC(draws=2000, posterior=2000, criterion=0.01, at_once=True, save_sims=None)
+PMC(draws, initial_draws, criterion, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
 ```
-
-    iteration = 27, current criterion = 0.007457038139021562, total draws = 965916, ϵ = 0.17167608067393303.
-
-To restart the PMC from scratch then one can run
+or 
 ```python
-abc.PMC(draws=1000, posterior=1000, criterion=0.01, at_once=True, save_sims=None, restart=True)
+PMC.PMC(
+    draws, initial_draws, criterion, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
 ```
+where
+ - `draws` - number of samples from the posterior
+ - `initial_draws` - number of samples from the prior to start the PMC (must be equal to or greater than the number of draws from the posterior
+ - `criterion` - the stopping condition, the fraction of times samples are accepted in any one iteration of the PMC (when this is small then many samples are not accepted into the population, suggesting a stationary distribution)
+ - `percentile` - the percentage of points which are considered the in the main sample (making this small moves more samples at once, but with reduced statistics from the population, default set to 75%, it takes longer to run (but may be cheaper in number of simulations) if set to a high value or `None`)
+ - `at_once` - boolean describing whether to process (and make) all simulations at once or not
+ - `save_sims` - string with the filename to save the sims (as a `.npy`) if provided
+ - `tqdm_notebook` - True if using a Jupyter notebook and False otherwise #TODO - make automatic (might already be implemented)
 
-
+### Histogrammed posterior
+The posterior is approximated by histogramming the accepted samples from the PMC and can be calculated using
 ```python
-fig, ax = plt.subplots(2, 2, figsize=(14, 10))
-plt.subplots_adjust(hspace=0, wspace=0.2)
-ax[0, 0].scatter(abc.PMC_dict["parameters"][:, 0] , abc.PMC_dict["MLE"][:, 0], s=1, label="Accepted samples", color="C4", alpha=0.5)
-ax[0, 0].axhline(abc.MLE[0, 0], color='black', linestyle='dashed', label="$\hat{\mu}_{obs}$")
-ax[0, 0].legend(frameon=False)
-ax[0, 0].set_ylabel('$\hat{\mu}$', labelpad=0)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_xticks([])
-ax[1, 0].scatter(abc.PMC_dict["parameters"][:, 0], abc.PMC_dict["MLE"][:, 1], s=1, alpha=0.5, label="Accepted samples", color="C4")
-ax[1, 0].axhline(abc.MLE[0, 1], color='black', linestyle='dashed', label="$\hat{\Sigma}_{obs}$")
-ax[1, 0].legend(frameon=False)
-ax[1, 0].set_ylabel('$\hat{\Sigma}$', labelpad=0)
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].set_xlabel("$\mu$")
-ax[0, 1].scatter(abc.PMC_dict["parameters"][:, 1], abc.PMC_dict["MLE"][:, 0], s=1, alpha=0.5, label="Accepted samples", color="C4")
-ax[0, 1].axhline(abc.MLE[0, 0], color='black', linestyle='dashed', label="$\hat{\mu}_{obs}$")
-ax[0, 1].legend(frameon=False)
-ax[0, 1].set_ylabel('$\hat{\mu}$', labelpad=0)
-ax[0, 1].set_xlim([0, 10])
-ax[0, 1].set_xticks([])
-ax[1, 1].scatter(abc.PMC_dict["parameters"][:, 1], abc.PMC_dict["MLE"][:, 1], s=1, alpha=0.5, label="Accepted samples", color="C4")
-ax[1, 1].axhline(abc.MLE[0, 1], color='black', linestyle='dashed', label="\hat{\Sigma}_{obs}")
-ax[1, 1].legend(frameon=False)
-ax[1, 1].set_ylabel('$\hat{\Sigma}$', labelpad=0)
-ax[1, 1].set_xlim([0, 10])
-ax[1, 1].set_xlabel("$\Sigma$");
+PMC.posterior(
+    {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
 ```
+where
+ - `bins` - number of bins in the histogram defining the posterior
+ - `ranges` - minimum and maximum values for each parameter in the histogram
+Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.posterior(...)` to run the PMC when calling posterior rather than calling the sampling step first.
 
-
-![png](figures/output_88_0.png)
-
-
-
+### Plot plosterior
+The posterior can be plotted using
 ```python
-fig, ax = plt.subplots(2, 2, figsize=(16, 10))
-plt.subplots_adjust(wspace = 0, hspace = 0)
-ax[0, 0].plot(parameter_grid[0, :, 0], np.sum(analytic_posterior * (parameter_grid[0, 1, 0] - parameter_grid[0, 0, 0]), axis = 0), linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[0, 0].plot(grid[0, :, 0], np.sum(gaussian_approximation * (grid[0, 1, 0] - grid[0, 0, 0]), axis = 0), color = "C1", label = "Gaussian approximation")
-ax[0, 0].hist(abc.ABC_dict["parameters"][accept_indices, 0], np.linspace(-10, 10, 100), histtype = u'step', density = True, linewidth = 1.5, color = "C6", alpha = 0.3, label = "ABC posterior");
-ax[0, 0].hist(abc.PMC_dict["parameters"][:, 0], np.linspace(-10, 10, 100), histtype = u'step', density = True, linewidth = 1.5, color = "C4", label = "PMC posterior");
-ax[0, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[0, 0].legend(frameon = False)
-ax[0, 0].set_xlim([-10, 10])
-ax[0, 0].set_ylabel('$\\mathcal{P}(\\mu|{\\bf d})$')
-ax[0, 0].set_yticks([])
-ax[0, 0].set_xticks([])
-ax[1, 0].set_xlabel('$\mu$');
-ax[1, 0].set_ylim([0, 10])
-ax[1, 0].set_ylabel('$\Sigma$')
-ax[1, 0].set_xlim([-10, 10])
-ax[1, 0].scatter(abc.ABC_dict["parameters"][accept_indices, 0], abc.ABC_dict["parameters"][accept_indices, 1], color = "C6", s = 1, alpha = 0.2)
-ax[1, 0].scatter(abc.PMC_dict["parameters"][:, 0], abc.PMC_dict["parameters"][:, 1], color = "C4", s = 1, alpha = 0.7)
-ax[1, 0].contour(parameter_grid[0, :, 0], parameter_grid[1, 0, :], analytic_posterior, colors = "C2")
-ax[1, 0].contour(grid[0, :, 0], grid[1, 0, :], gaussian_approximation, colors = "C1")
-ax[1, 0].axvline(abc.MLE[0, 0], linestyle = "dashed", color = "black", label = "Maximum likelihood estimate of mean")
-ax[1, 0].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].hist(abc.ABC_dict["parameters"][accept_indices, 1], np.linspace(0, 10, 100), histtype = u'step', orientation="horizontal", density = True, linewidth = 1.5, color = "C6", alpha = 0.3, label = "ABC posterior");
-ax[1, 1].plot(np.sum(analytic_posterior * (parameter_grid[1, 0, 1] - parameter_grid[1, 0, 0]), axis = 1), parameter_grid[1, 0, :], linewidth = 1.5, color = 'C2', label = "Analytic marginalised posterior")
-ax[1, 1].plot(np.sum(gaussian_approximation * (grid[1, 0, 1] - grid[1, 0, 0]), axis = 1), grid[1, 0, :], color = "C1", label = "Gaussian approximation")
-ax[1, 1].hist(abc.PMC_dict["parameters"][:, 1], np.linspace(0, 10, 100), histtype = u'step', orientation="horizontal", density = True, linewidth = 1.5, color = "C4", label = "PMC posterior");
-ax[1, 1].axhline(abc.MLE[0, 1], linestyle = "dotted", color = "black", label = "Maximum likelihood estimate of covariance")
-ax[1, 1].legend(frameon = False)
-ax[1, 1].set_ylim([0, 10])
-ax[1, 1].set_xlabel('$\\mathcal{P}(\\Sigma|{\\bf d})$')
-ax[1, 1].set_xticks([])
-ax[1, 1].set_yticks([])
-ax[0, 1].axis("off");
+PMC.plot(
+    {smoothing}, {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
+where 
+ - `smoothing` - the pixel range of a Gaussian smoothing of the histogram for plotting (smoothing causes inflation of the posterior)
+Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.plot(...)` to run the PMC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
+### Plot samples
+The samples can also be plotted using
+```python
+PMC.scatter_plot(
+    {axes}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
+```
+where 
+ - `axes` - either `"parameter_estimate"`, `"parameter_parameter"`, or `"estimate_estimate"` for plotting the estimates against the parameters, or the parameters against the parameters or the estimates against the estimates (the last two are good for diagnostics such as the completeness of the sampling from the prior and the shape and correlation of the estimation function)
+Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.scatter_plot(...)` to run the PMC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
-![png](figures/output_89_0.png)
+# TODO
+_____
 
-
-We can see that the IMNN can recover great posteriors even when the data is extremely far from the fiducial parameter value at which the network was trained! Woohoo - give yourself a pat on the back!
+The module is under constant development, and progress can be checked in the `dev` branch. Current additions to the IMNN include
+- Put back summary support 
+ - Previous versions of the IMNN had the ability to pass arbitrary summaries along with network summaries. This is useful because it can be a suggestion of how much information is gained over other summarising functions (such as the two point statistics, etc.)
+ - Need to accept array, generative function and TFRecords with summaries and split covariance between summaries and network outputs for regularisation
+- JAX implementation of all routines
+ - This is under private development currently
+- Docstrings written for LFI
+- Write unit tests

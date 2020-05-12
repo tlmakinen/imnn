@@ -10,7 +10,7 @@ __author__ = "Tom Charnock"
 
 class GenerateGaussianNoise():
     def __init__(self, input_shape=(10,), n_params=2, n_summaries=2, n_s=1000, n_d=1000, n_d_small=100,
-                 fiducial=np.array([0., 1.]), delta=np.array([0.1, 0.1]), training_seed=0,
+                 θ_fid=np.array([0., 1.]), δθ=np.array([0.1, 0.1]), training_seed=0,
                  validation_seed=1):
         self.input_shape = input_shape
         self.n_params = n_params
@@ -18,8 +18,9 @@ class GenerateGaussianNoise():
         self.n_s = n_s
         self.n_d = n_d
         self.n_d_small = n_d_small
-        self.fiducial = fiducial
-        self.delta = delta
+        self.θ_fid = θ_fid
+        self.δθ = δθ
+        self.half_δθ = δθ / 2.
         self.training_seed = training_seed
         self.validation_seed = validation_seed
 
@@ -54,7 +55,7 @@ class GenerateGaussianNoise():
             np.random.normal(
                 parameters[:, 0], 
                 np.sqrt(parameters[:, 1]), 
-                simulator_args["input_shape"] + (parameters.shape[0],)), 
+                self.input_shape + (parameters.shape[0],)), 
             -1, 0)
         
     def generate_data(self, size="full"):
@@ -65,95 +66,95 @@ class GenerateGaussianNoise():
             n_summaries=self.n_summaries,
             n_s=self.n_s,
             n_d=self.n_d,
-            fiducial=self.fiducial,
-            delta=(2. * self.delta))
+            θ_fid=self.θ_fid,
+            δθ=self.δθ)
         
-        a_0 = self.AL.simulator(
+        a_0 = self.simulator(
             parameters=np.repeat(
-                self.fiducial[np.newaxis, :], 
+                self.θ_fid[np.newaxis, :], 
                 self.n_s, 
                 axis=0),
             seed=self.training_seed,
             simulator_args={"input_shape": self.input_shape})
-        a_1 = self.AL.simulator(
+        a_1 = self.simulator(
             parameters=np.repeat(
-                self.fiducial[np.newaxis, :], 
+                self.θ_fid[np.newaxis, :], 
                 self.n_s, 
                 axis=0),
             seed=self.validation_seed,
             simulator_args={"input_shape": self.input_shape})
 
-        b_0 = self.AL.simulator(
+        b_0 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0] - self.delta[0], 
-                    self.fiducial[1]])[np.newaxis, :], 
+                    self.θ_fid[0] - self.half_δθ[0], 
+                    self.θ_fid[1]])[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.training_seed,
             simulator_args={"input_shape": self.input_shape})
-        b_1 = self.AL.simulator(
+        b_1 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0] - self.delta[0], 
-                    self.fiducial[1]])[np.newaxis, :], 
+                    self.θ_fid[0] - self.half_δθ[0], 
+                    self.θ_fid[1]])[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.validation_seed,
             simulator_args={"input_shape": self.input_shape})        
-        c_0 = self.AL.simulator(
+        c_0 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0] + self.delta[0], 
-                    self.fiducial[1]])[np.newaxis, :], 
+                    self.θ_fid[0] + self.half_δθ[0], 
+                    self.θ_fid[1]])[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.training_seed,
             simulator_args={"input_shape": self.input_shape})
-        c_1 = self.AL.simulator(
+        c_1 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0] + self.delta[0], 
-                    self.fiducial[1]])[np.newaxis, :], 
+                    self.θ_fid[0] + self.half_δθ[0], 
+                    self.θ_fid[1]])[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.validation_seed,
             simulator_args={"input_shape": self.input_shape})
-        d_0 = self.AL.simulator(
+        d_0 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0], 
-                    self.fiducial[1] - self.delta[1]]
+                    self.θ_fid[0], 
+                    self.θ_fid[1] - self.half_δθ[1]]
                 )[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.training_seed,
             simulator_args={"input_shape": self.input_shape})
-        d_1 = self.AL.simulator(
+        d_1 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0], 
-                    self.fiducial[1] - self.delta[1]]
+                    self.θ_fid[0], 
+                    self.θ_fid[1] - self.half_δθ[1]]
                 )[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.validation_seed,
             simulator_args={"input_shape": self.input_shape})       
-        e_0 = self.AL.simulator(
+        e_0 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0], 
-                    self.fiducial[1] + self.delta[1]]
+                    self.θ_fid[0], 
+                    self.θ_fid[1] + self.half_δθ[1]]
                 )[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
             seed=self.training_seed,
             simulator_args={"input_shape": self.input_shape})
-        e_1 = self.AL.simulator(
+        e_1 = self.simulator(
             parameters=np.repeat(
                 np.array([
-                    self.fiducial[0], 
-                    self.fiducial[1] + self.delta[1]]
+                    self.θ_fid[0], 
+                    self.θ_fid[1] + self.half_δθ[1]]
                 )[np.newaxis, :], 
                 self.n_d, 
                 axis=0),
@@ -168,12 +169,16 @@ class GenerateGaussianNoise():
                       ).transpose(2, 1, 0, 3)
 
         result = (details, a_0, a_1, f_0, f_1)
-            
+         
+        #TO ADD    
+        #if analytic_derivative:
+        #    f_0 = (f_0[:, 1] - f_0[:, 0]) / self.δθ[np.newaxis, ...]
+        #    f_1 = (f_1[:, 1] - f_1[:, 0]) / self.δθ[np.newaxis, ...]
         if size == "all":
             details["n_d_small"] = self.n_d_small
             result += (f_0[:self.n_d_small],
                         f_1[:self.n_d_small])
-        if size == "small":
+        elif size == "small":
             details["n_d"] = self.n_d_small
             result[-2] = f_0[:self.n_d_small]
             result[-1] = f_1[:self.n_d_small]
