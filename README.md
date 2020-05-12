@@ -1,6 +1,5 @@
 
 # Information maximising neural networks
-________________________________________
 
 Optimising a neural network to maximise the Fisher information provides us with a function able to massively compress data without losing information about parameters of interest. This function can then be used for likelihood-free inference.
 
@@ -56,12 +55,10 @@ python3 setup.py
 ```
 
 # Modules
-_________
 
 Available are modules for fitting the IMNN in `IMNN` and for doing likelihood-free inference in `LFI`. Examples of how to use these modules are available in the `examples` directory.
 
 # IMNN
-_______
 
 The basic call for the IMNN is
 ```python
@@ -101,8 +98,8 @@ where
 ### Fit
 ```python
 imnn.fit(
-    {n_iterations}, {λ}, {ϵ}, {reset}, {patience}, {min_iterations}, {checkpoint},
-    {tqdm_notebook}, {weight_file})
+    {n_iterations}, {λ}, {ϵ}, {reset}, {patience}, {min_iterations}, 
+    {checkpoint}, {tqdm_notebook}, {weight_file})
 ```
 where
  - `n_iterations` - number of iterations to run the fitting for (can be None when using patience)
@@ -211,7 +208,6 @@ opt = tf.keras.optimizers.Adam()
 Make sure to choose this network sensibly so that it best pulls the information from the data.
 
 # LFI
-_______
 
 The LFI module provides a Gaussian approximation to the posterior, a simple approximation Bayesian computation (ABC) implementation and a population Monte Carlo (PMC). These work with any estimator and not just with the IMNN.
 
@@ -336,7 +332,8 @@ where
 The posterior is approximated by histogramming the accepted samples from the ABC (and acception/rejection) and can be calculated using
 ```python
 ABC.posterior(
-    {bins}, {ranges}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook})
+    {bins}, {ranges}, {ϵ}, {draws}, {accepted}, 
+    {at_once}, {save_sims}, {tqdm_notebook})
 ```
 where
  - `bins` - number of bins in the histogram defining the posterior
@@ -347,7 +344,8 @@ Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, a
 The posterior can be plotted using
 ```python
 ABC.plot(
-    {smoothing}, {bins}, {ranges}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
+    {smoothing}, {bins}, {ranges}, {ϵ}, {draws}, {accepted}, 
+    {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
 where 
  - `smoothing` - the pixel range of a Gaussian smoothing of the histogram for plotting (smoothing causes inflation of the posterior)
@@ -357,7 +355,8 @@ Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, a
 The samples can also be plotted using
 ```python
 ABC.scatter_plot(
-    {axes}, {rejected}, {ϵ}, {draws}, {accepted}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
+    {axes}, {rejected}, {ϵ}, {draws}, {accepted}, 
+    {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
 where 
  - `axes` - either `"parameter_estimate"`, `"parameter_parameter"`, or `"estimate_estimate"` for plotting the estimates against the parameters, or the parameters against the parameters or the estimates against the estimates (the last two are good for diagnostics such as the completeness of the sampling from the prior and the shape and correlation of the estimation function)
@@ -384,12 +383,14 @@ where
 ### Obtaining accepted samples
 The PMC can be run by calling 
 ```python
-PMC(draws, initial_draws, criterion, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
+PMC(draws, initial_draws, criterion, {percentile}, 
+    {at_once}, {save_sims}, {tqdm_notebook})
 ```
 or 
 ```python
 PMC.PMC(
-    draws, initial_draws, criterion, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
+    draws, initial_draws, criterion, {percentile}, 
+    {at_once}, {save_sims}, {tqdm_notebook})
 ```
 where
  - `draws` - number of samples from the posterior
@@ -404,7 +405,8 @@ where
 The posterior is approximated by histogramming the accepted samples from the PMC and can be calculated using
 ```python
 PMC.posterior(
-    {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook})
+    {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, {percentile}, 
+    {at_once}, {save_sims}, {tqdm_notebook})
 ```
 where
  - `bins` - number of bins in the histogram defining the posterior
@@ -415,7 +417,8 @@ Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.poster
 The posterior can be plotted using
 ```python
 PMC.plot(
-    {smoothing}, {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
+    {smoothing}, {bins}, {ranges}, {draws}, {initial_draws}, {criterion}, 
+    {percentile}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
 where 
  - `smoothing` - the pixel range of a Gaussian smoothing of the histogram for plotting (smoothing causes inflation of the posterior)
@@ -425,14 +428,14 @@ Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.plot(.
 The samples can also be plotted using
 ```python
 PMC.scatter_plot(
-    {axes}, {draws}, {initial_draws}, {criterion}, {percentile}, {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
+    {axes}, {draws}, {initial_draws}, {criterion}, {percentile}, 
+    {at_once}, {save_sims}, {tqdm_notebook}, **kwargs)
 ```
 where 
  - `axes` - either `"parameter_estimate"`, `"parameter_parameter"`, or `"estimate_estimate"` for plotting the estimates against the parameters, or the parameters against the parameters or the estimates against the estimates (the last two are good for diagnostics such as the completeness of the sampling from the prior and the shape and correlation of the estimation function)
 Optionally any of the parameters for `PMC.PMC(...)` can be passed to `PMC.scatter_plot(...)` to run the PMC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
 # TODO
-_____
 
 The module is under constant development, and progress can be checked in the `dev` branch. Current additions to the IMNN include
 - Put back summary support 
@@ -442,3 +445,8 @@ The module is under constant development, and progress can be checked in the `de
  - This is under private development currently
 - Docstrings written for LFI
 - Write unit tests
+
+
+```python
+
+```
