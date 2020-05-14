@@ -263,10 +263,10 @@ class ApproximateBayesianComputation(LFI):
         super().__init__(**kwargs)
         self.reset()
             
-    def __call__(self, draws, at_once=True, save_sims=None):
-        return self.ABC(draws, at_once, save_sims=None)
+    def __call__(self, draws, at_once=True, save_sims=None, predrawn=False):
+        return self.ABC(draws, at_once, save_sims=None, predrawn=predrawn)
         
-    def ABC(self, draws, at_once=True, save_sims=None, PMC=False, update=True):
+    def ABC(self, draws, at_once=True, save_sims=None, predrawn=False, update=True):
         """Approximate Bayesian computation
 
         Here we draw some parameter values from the prior supplied to the class
@@ -291,7 +291,7 @@ class ApproximateBayesianComputation(LFI):
         return_dict : bool, optional
             the ABC_dict attribute is normally updated, but the dictionary can
             be returned by the function. this is used by the PMC.
-        PMC : bool, optional
+        predrawn : bool, optional
             if this is true then the parameters are passed directly to ABC
             rather than being drawn in the ABC. this is used by the PMC.
         bar : func
@@ -309,7 +309,7 @@ class ApproximateBayesianComputation(LFI):
             the distance mesure describing how similar the observed estimate is
             to the estimates of the simulations
         """
-        if PMC:
+        if predrawn:
             parameters = draws
             draws = parameters.shape[0]
         else:
@@ -766,7 +766,8 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                                     self.prior.high),
                                 axis=1))
                         s_ind = s_ind[~accepted]
-                    parameters, estimates, differences, distances = self.ABC(samples, at_once=at_once, save_sims=save_sims, PMC=True, update=False)
+                    parameters, estimates, differences, distances = self.ABC(
+                        samples, at_once=at_once, save_sims=save_sims, predrawn=True, update=False)
                     distances = np.diag(distances[:, t_ind])
                     differences = np.vstack([np.diag(differences[:, t_ind, i]) for i in range(self.n_params)]).T
                     accepted = np.less(
