@@ -363,6 +363,16 @@ where
  - `rejected` - a number between `0` and `1` describing the fraction of the rejected samples to plot (there are often orders of magnitude more samples rejected and so it makes sense to plot fewer, if they are to be plotted at all)
 Optionally any of the parameters for `ABC.ABC(...)`, `ABC.accept_reject(...)`, and/or `ABC.get_min_accepted(...)` can be passed to `ABC.scatter_plot(...)` to run the ABC when making the plot rather than calling the sampling step first. `matplotlib` parameters can also be passed for the plotting routine.
 
+### Running with saved simulations
+If simulations have already been run and we want to perform a simple ABC on them then we can set the simulator to return the saved simulations, `saved_simulations -> (?) + input_shape`, and pass the corresponding saved parameters, `saved_parameters -> (?, n_params)`, used to make the simulation.
+```python
+simulator = lambda _ : saved_simulations
+ABC = LFI.ApproximateBayesianComputation(
+    target_data, prior, Fisher, get_estimate, simulator, {labels})
+ABC(draws=saved_parameters, predrawn=True, save_sims=None, {at_once})
+ABC.accept_reject(ϵ)
+```
+
 ## Population Monte Carlo (PMC)
 
 Whilst we can obtain approximate posteriors using ABC, the rejection rate is very high because we sample always from the prior. Population Monte Carlo (PMC) uses statistics of the population of samples to propose new parameter values, so each new simulation is more likely to be accepted. This prevents us needing to define an ϵ parameter to define the acceptance distance. Instead we start with a population from the prior and iteratively move samples inwards. Once it becomes difficult to move the population any more, i.e. the number of attempts to accept a parameter becomes very large, then the distribution is seen to be a stable approximation to the posterior.
