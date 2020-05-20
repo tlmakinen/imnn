@@ -72,7 +72,7 @@ class LFI():
                     else:
                         low.append(-np.inf)
             else:
-                low = [-np.inf for i in self.n_params]
+                low = [-np.inf for i in range(self.n_params)]
                 
             self.prior.low = low
         if not hasattr(self.prior, "high"):
