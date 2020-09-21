@@ -102,6 +102,8 @@ class IMNN:
         decay rate for the regularisation
     history : dict
         history object for saving training statistics.
+    iteration : int
+        a counter for the number of iterations of fitting
     """
     def __init__(self, n_s, n_d, n_params, n_summaries, 
                  θ_fid, δθ, input_shape, fiducial, derivative, 
@@ -297,6 +299,8 @@ class IMNN:
         self.λ = None
         self.α = None
         self.identity = None
+
+        self.iteration = None
 
     def initialise_history(self):
         """Sets up dictionary of lists for collecting training diagnostics
@@ -1528,6 +1532,7 @@ class IMNN:
             weights = self.model.get_weights()
             patience_counter = 0
             this_iteration = 0
+            self.iteration = 0
             calculate_patience = True
             min_reached = False
             if min_iterations is None:
@@ -1544,6 +1549,7 @@ class IMNN:
         else:
             bar = tqdm.tqdm(range(n_iterations), total=total, desc="Iterations")
         for iterations in bar:
+            self.iteration += 1
             self.F, self.C, self.Cinv, self.μ, self.dμ_dθ, self.reg, self.r = \
                 self.trainer(self.F, self.C, self.Cinv, self.μ, self.dμ_dθ,
                              self.reg, self.r)
