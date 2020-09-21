@@ -447,6 +447,21 @@ class IMNN:
             dtype=self.dtype,
             name="derivative_steps")
 
+    def map_fn(self, simulation, indices, map_fn=None):
+        """An internalised function for alling map_fn with IMNN attributes
+
+        Parameters
+        __________
+        simulation : TF Data (float) input_shape
+            the simulation to be preprocessed
+        indices : TF Data (int) or tuple(int, int, int)
+            the seed (and derivative flag and parameter index of the simulation)
+        """
+        
+        if map_fn is None:
+            return (simulation, indices)
+	return (map_fn(simulation, indices), indices)
+
     def set_data(self, input_shape, fiducial, derivative,
                  validation_fiducial, validation_derivative,
                  at_once, map_fn, check_shape):
@@ -670,7 +685,7 @@ class IMNN:
         if map_fn is not None:
             dataset = dataset.map(
                 lambda data, indices:
-                    (map_fn(data, indices), indices))
+                    self.map_fn(data, indices, map_fn=map_fn))
         dataset = dataset.batch(at_once)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
         return dataset.cache()
