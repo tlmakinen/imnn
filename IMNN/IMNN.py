@@ -666,7 +666,7 @@ class IMNN:
         if map_fn is not None:
             dataset = dataset.map(
                 lambda data, indices:
-                    (map_fn(data), indices))
+                    (map_fn(data, indices), indices))
         dataset = dataset.batch(at_once)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
         return dataset.cache()
