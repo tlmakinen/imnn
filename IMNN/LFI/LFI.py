@@ -8,7 +8,7 @@ The documentation for this module is not complete, and stability may be patchy (
 """
 
 
-__version__ = '0.2a5'
+__version__ = '0.2dev'
 __author__ = "Tom Charnock"
 
 
@@ -73,7 +73,7 @@ class LFI():
                         low.append(-np.inf)
             else:
                 low = [-np.inf for i in range(self.n_params)]
-                
+
             self.prior.low = low
         if not hasattr(self.prior, "high"):
             high = []
@@ -115,11 +115,11 @@ class LFI():
     def scatter(self, indices, updates, shape):
         a = np.zeros(shape)
         np.add.at(
-            a, 
+            a,
             tuple(indices),
             updates)
-        return a   
-    
+        return a
+
     def levels(self, array, levels):
         array = np.sort(array.flatten())
         cdf = np.cumsum(array / np.sum(array))
@@ -130,8 +130,8 @@ class LFI():
             contours = np.unique(contours)
         else:
             contours = array[np.argmin(np.abs(cdf - levels))]
-        return contours 
-        
+        return contours
+
     def plot_Fisher(self, ax=None, figsize=(10, 10), save=None):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -147,11 +147,11 @@ class LFI():
         ax.set_ylabel("Parameters")
         plt.colorbar(a, ax=ax, fraction=0.046, pad=0.04)
         if save is not None:
-            plt.savefig(save, 
-                        bbox_inches="tight", 
+            plt.savefig(save,
+                        bbox_inches="tight",
                         transparancy=True)
         return ax
-                
+
     def setup_triangle_plot(self, ax=None, figsize=None, wspace=0.1, hspace=0.1, **kwargs):
         if ax is None:
             fig, ax = plt.subplots(self.n_params, self.n_params, figsize=figsize)
@@ -172,15 +172,15 @@ class LFI():
                     ax[j_, 0].get_shared_y_axes().join(
                     ax[j_, 0], ax[j_, i_])
                     ax[j_, i_].set_yticks([])
-                if j_ > 0: 
+                if j_ > 0:
                     ax[0, i_].get_shared_x_axes().join(
                     ax[0, i_], ax[j_, i_])
             elif i_ == j_:
                 ax[i_, j_].yaxis.tick_right()
                 if self.labels is not None:
                     ax[j_, i_].set_ylabel(
-                        r"$\mathcal{P}($" + self.labels[i_] + "$|{\\bf t})$", 
-                        rotation=270, 
+                        r"$\mathcal{P}($" + self.labels[i_] + "$|{\\bf t})$",
+                        rotation=270,
                         labelpad=15)
                     ax[j_, i_].yaxis.set_label_position("right")
                 if j_ < self.n_params - 1:
@@ -188,15 +188,15 @@ class LFI():
                 if j_ == self.n_params - 1:
                     if self.labels is not None:
                         ax[j_, i_].set_xlabel(self.labels[i_])
-                if j_ > 0: 
+                if j_ > 0:
                     ax[0, i_].get_shared_x_axes().join(
                     ax[0, i_], ax[j_, i_])
             else:
                 ax[j_, i_].axis("off")
         return ax
-    
-    def triangle_plot(self, distribution, grid, meshgrid=True, color=None, 
-                      label=None, levels=[0.68, 0.95, 0.99], smoothing=None, 
+
+    def triangle_plot(self, distribution, grid, meshgrid=True, color=None,
+                      label=None, levels=[0.68, 0.95, 0.99], smoothing=None,
                       **kwargs):
         if smoothing is not None:
             smoother = lambda x : gaussian_filter(x, smoothing, mode="nearest")
@@ -205,13 +205,13 @@ class LFI():
         if meshgrid:
             grid = np.array(
                 [np.mean(
-                    grid[i], 
+                    grid[i],
                     axis=tuple(
                         np.setdiff1d(
                             np.arange(
-                                self.n_params), 
-                            i))) 
-                 for i in range(self.n_params)]) 
+                                self.n_params),
+                            i)))
+                 for i in range(self.n_params)])
         if len(distribution.shape) == self.n_params:
             distribution = distribution[np.newaxis, ...]
         ax = self.setup_triangle_plot(**kwargs)
@@ -223,15 +223,15 @@ class LFI():
                 for datum in range(distribution.shape[0]):
                     this_distribution = smoother(
                         np.sum(
-                            distribution[datum], 
+                            distribution[datum],
                             axis=tuple(
                                 np.setdiff1d(
-                                    np.arange(self.n_params), 
+                                    np.arange(self.n_params),
                                     i_))))
                     this_distribution = this_distribution / np.sum(
-                        this_distribution * 
+                        this_distribution *
                         (grid[i_][1] - grid[i_][0]))
-                    a, = ax[j_, i_].plot(grid[i_], this_distribution.T, 
+                    a, = ax[j_, i_].plot(grid[i_], this_distribution.T,
                                          color=color, label=label)
                     colours.append(a.get_color())
                 if i_ == 0:
@@ -241,31 +241,31 @@ class LFI():
                 for datum in range(distribution.shape[0]):
                     this_distribution = smoother(
                         np.sum(
-                            distribution[datum], 
+                            distribution[datum],
                             axis=tuple(
                                 np.setdiff1d(
-                                    np.arange(self.n_params), 
+                                    np.arange(self.n_params),
                                     np.array([i_, j_])))))
                     this_distribution = this_distribution / np.sum(
-                        this_distribution * 
-                        (grid[i_][1] - grid[i_][0]) * 
+                        this_distribution *
+                        (grid[i_][1] - grid[i_][0]) *
                         (grid[j_][1] - grid[j_][0]))
                     ax[j_, i_].contour(
-                        grid[i_], 
-                        grid[j_], 
-                        this_distribution.T, 
-                        colors=colours[datum], 
+                        grid[i_],
+                        grid[j_],
+                        this_distribution.T,
+                        colors=colours[datum],
                         levels=self.levels(this_distribution, levels))
         return ax
-    
+
 class ApproximateBayesianComputation(LFI):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.reset()
-            
+
     def __call__(self, draws, at_once=True, save_sims=None, predrawn=False):
         return self.ABC(draws, at_once, save_sims=None, predrawn=predrawn)
-        
+
     def ABC(self, draws, at_once=True, save_sims=None, predrawn=False, update=True):
         """Approximate Bayesian computation
 
@@ -349,7 +349,7 @@ class ApproximateBayesianComputation(LFI):
             self.differences = differences
             self.distances = distances
         return parameters, estimates, differences, distances
-    
+
     def reset(self):
         self.parameters = np.array([]).reshape((0, self.n_params))
         self.differences = np.array([]).reshape((0, self.targets, self.n_params))
@@ -368,7 +368,7 @@ class ApproximateBayesianComputation(LFI):
         self.rejected_distances = None
         self.grid = None
         self.post = None
-        
+
     def accept_reject(self, ϵ):
         if self.parameters.shape[0] == 0:
             print("The ABC has not yet been called. Pass `draws` or run ABC(draws) "
@@ -376,10 +376,10 @@ class ApproximateBayesianComputation(LFI):
             sys.exit()
         self.num_draws = self.distances.shape[0]
         accepted = np.array([
-            np.argwhere(self.distances[:, i] < ϵ)[:, 0] 
+            np.argwhere(self.distances[:, i] < ϵ)[:, 0]
             for i in range(self.targets)])
         rejected = np.array([
-            np.argwhere(self.distances[:, i] >= ϵ)[:, 0]        
+            np.argwhere(self.distances[:, i] >= ϵ)[:, 0]
             for i in range(self.targets)])
         self.num_accepted = np.array([
             indices.shape[0] for indices in accepted])
@@ -401,13 +401,13 @@ class ApproximateBayesianComputation(LFI):
             self.distances[indices, i] for i, indices in enumerate(accepted)])
         self.rejected_distances = np.array([
             self.distances[indices, i] for i, indices in enumerate(rejected)])
-        
-    def get_min_accepted(self, ϵ, accepted, min_draws=1, at_once=True, 
+
+    def get_min_accepted(self, ϵ, accepted, min_draws=1, at_once=True,
                          save_sims=None, tqdm_notebook=True):
         if min_draws is None:
             min_draws = 1
         if self.parameters.shape[0] == 0:
-            self.__call__(draws=min_draws, at_once=at_once, 
+            self.__call__(draws=min_draws, at_once=at_once,
                           save_sims=save_sims)
         self.accept_reject(ϵ=ϵ)
         if np.any(self.num_accepted < accepted):
@@ -416,12 +416,12 @@ class ApproximateBayesianComputation(LFI):
             else:
                 bar = tqdm.tqdm(total=np.inf, desc="Draws")
         while np.any(self.num_accepted < accepted):
-            self.__call__(draws=min_draws, at_once=at_once, 
+            self.__call__(draws=min_draws, at_once=at_once,
                           save_sims=save_sims)
             self.accept_reject(ϵ=ϵ)
             bar.update(self.num_draws)
             bar.set_postfix(Accepted=self.num_accepted, Remaining=accepted-self.num_accepted)
-        
+
     def posterior(self, bins=25, ranges=None, **kwargs):
         self.setup_points(**kwargs)
         if ranges is None:
@@ -434,20 +434,20 @@ class ApproximateBayesianComputation(LFI):
             if len(high_ind) != 0:
                 high[high_ind] = np.max(self.parameters, axis=(0, 1))[high_ind]
             ranges = [(low[i], high[i]) for i in range(self.n_params)]
-        temp = [np.histogramdd(parameters, density=True, range=ranges, bins=bins) 
+        temp = [np.histogramdd(parameters, density=True, range=ranges, bins=bins)
                 for parameters in self.accepted_parameters]
         self.post = np.concatenate(
             [temp[i][0][np.newaxis, ...] for i in range(self.targets)],
             axis=0)
         self.grid = np.array([
-            temp[0][1][i][:-1] + (temp[0][1][i][1] - temp[0][1][i][0]) / 2. 
+            temp[0][1][i][:-1] + (temp[0][1][i][1] - temp[0][1][i][0]) / 2.
             for i in range(self.n_params)])
         return self.post
-        
+
     def plot(self, smoothing=None, **kwargs):
         posterior = self.posterior(**kwargs)
         return self.triangle_plot(posterior, grid=self.grid, meshgrid=False,smoothing=smoothing, **kwargs)
-    
+
     def setup_points(self, ϵ=None, draws=None, accepted=None, at_once=True, save_sims=None, tqdm_notebook=True, **kwargs):
         if ϵ is not None:
             if accepted is not None:
@@ -462,7 +462,7 @@ class ApproximateBayesianComputation(LFI):
             print("The ABC acceptance and rejection has not yet been called. "
                   "Pass `ϵ` (and `draws` if the ABC has not been called).")
             sys.exit()
-            
+
     def _scatter_plot(self, axes="parameter_estimate", rejected=0.1, ax=None, figsize=None, wspace=0, hspace=0, **kwargs):
         if rejected > 0:
             plot_rejected = True
@@ -472,10 +472,10 @@ class ApproximateBayesianComputation(LFI):
             if self.rejected_parameters[i].shape[0] == 0:
                 plot_rejected = False
         if self.targets > 1:
-            accepted_labels = ["Accepted simulations {}".format(i+1) 
+            accepted_labels = ["Accepted simulations {}".format(i+1)
                                for i in range(self.targets)]
             if plot_rejected:
-                rejected_labels = ["Rejected simulations {}".format(i+1) 
+                rejected_labels = ["Rejected simulations {}".format(i+1)
                                    for i in range(self.targets)]
         else:
             accepted_labels = ["Accepted simulations"]
@@ -485,9 +485,9 @@ class ApproximateBayesianComputation(LFI):
             x_accepted = self.accepted_parameters
             y_accepted = self.accepted_estimates
             if plot_rejected:
-                x_rejected = np.array([self.rejected_parameters[i][::int(1/rejected)] 
+                x_rejected = np.array([self.rejected_parameters[i][::int(1/rejected)]
                                        for i in range(self.targets)])
-                y_rejected = np.array([self.rejected_estimates[i][::int(1/rejected)] 
+                y_rejected = np.array([self.rejected_estimates[i][::int(1/rejected)]
                                        for i in range(self.targets)])
             axhline = self.estimate
             axvline = None
@@ -500,7 +500,7 @@ class ApproximateBayesianComputation(LFI):
             x_accepted = self.accepted_parameters
             y_accepted = x_accepted
             if plot_rejected:
-                x_rejected = np.array([self.rejected_parameters[i][::int(1/rejected)] 
+                x_rejected = np.array([self.rejected_parameters[i][::int(1/rejected)]
                                        for i in range(self.targets)])
                 y_rejected = x_rejected
             axhline = None
@@ -514,7 +514,7 @@ class ApproximateBayesianComputation(LFI):
             x_accepted = self.accepted_estimates
             y_accepted = x_accepted
             if plot_rejected:
-                x_rejected = np.array([self.rejected_estimates[i][::int(1/rejected)] 
+                x_rejected = np.array([self.rejected_estimates[i][::int(1/rejected)]
                                        for i in range(self.targets)])
                 y_rejected = x_rejected
             xlabels = ["Estimate {}".format(i+1) for i in range(self.n_params)]
@@ -544,23 +544,23 @@ class ApproximateBayesianComputation(LFI):
                     ax[j, 0], ax[j, i])
                 if plot_rejected:
                     for k in range(self.targets):
-                        ax[j, i].scatter(x_rejected[k][:, i], y_rejected[k][:, j], 
+                        ax[j, i].scatter(x_rejected[k][:, i], y_rejected[k][:, j],
                                          s=1, label=rejected_labels[k])
                 for k in range(self.targets):
-                    ax[j, i].scatter(x_accepted[k][:, i], y_accepted[k][:, j], 
+                    ax[j, i].scatter(x_accepted[k][:, i], y_accepted[k][:, j],
                                      s=1, label=accepted_labels[k])
                 if axhline is not None:
                     for k in range(self.targets):
-                        ax[j, i].axhline(axhline[k, j], linestyle="dashed", 
+                        ax[j, i].axhline(axhline[k, j], linestyle="dashed",
                                          color="black")
                 if axvline is not None:
                     for k in range(self.targets):
-                        ax[j, i].axvline(axvline[k, i], linestyle="dashed", 
+                        ax[j, i].axvline(axvline[k, i], linestyle="dashed",
                                          color="black")
-        ax[0, 0].legend(frameon=False, 
+        ax[0, 0].legend(frameon=False,
                         bbox_to_anchor=(self.n_params+1, self.n_params-1))
         return ax
-    
+
     def scatter_plot(self, ϵ=None, draws=None, accepted=None, at_once=True, save_sims=None, tqdm_notebook=True, **kwargs):
         self.setup_points(ϵ=ϵ, draws=draws, accepted=accepted, at_once=at_once, save_sims=save_sims, tqdm_notebook=tqdm_notebook)
         self._scatter_plot(**kwargs)
@@ -568,13 +568,13 @@ class ApproximateBayesianComputation(LFI):
 class PopulationMonteCarlo(ApproximateBayesianComputation):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-            
-    def __call__(self, draws, initial_draws, criterion, percentile=75, 
+
+    def __call__(self, draws, initial_draws, criterion, percentile=75,
                  at_once=True, save_sims=None, tqdm_notebook=True):
-        self.PMC(draws=draws, initial_draws=initial_draws, criterion=criterion, 
+        self.PMC(draws=draws, initial_draws=initial_draws, criterion=criterion,
                  percentile=percentile, at_once=at_once, save_sims=save_sims, tqdm_notebook=tqdm_notebook)
-    
-    def PMC(self, draws, initial_draws, criterion, percentile=75, 
+
+    def PMC(self, draws, initial_draws, criterion, percentile=75,
             at_once=True, save_sims=None, tqdm_notebook=True):
         """Population Monte Carlo
 
@@ -678,7 +678,7 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                 if self.parameters.shape[0] == 0:
                     self.ABC(initial_draws, at_once=at_once, save_sims=save_sims)
                     self.parameters = np.repeat(
-                        self.parameters[np.newaxis, ...], 
+                        self.parameters[np.newaxis, ...],
                         self.targets, axis=0)
                     self.estimates = np.repeat(
                         self.estimates[np.newaxis, ...],
@@ -690,20 +690,20 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                 else:
                     parameters, estimates, differences, distances = self.ABC(initial_draws, at_once=at_once, save_sims=save_sims, update=False)
                     self.parameters = np.concatenate(
-                        [self.parameters, 
+                        [self.parameters,
                          np.repeat(
-                             parameters[np.newaxis, ...], 
+                             parameters[np.newaxis, ...],
                              self.targets, axis=0)], axis=1)
                     self.estimates = np.concatenate(
-                        [self.estimates, 
+                        [self.estimates,
                          np.repeat(
                              estimates[np.newaxis, ...],
                              self.targets, axis=0)], axis=1)
                     self.differences = np.concatenate(
-                        [self.differences, 
+                        [self.differences,
                          np.moveaxis(differences, 0, 1)], axis=1)
                     self.distances = np.concatenate(
-                        [self.distances, 
+                        [self.distances,
                          np.moveaxis(distances, 0, 1)], axis=1)
                     self.weighting = np.concatenate(
                         [self.weighting, np.zeros((self.targets, initial_draws))], axis=1)
@@ -725,8 +725,8 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                 iteration_draws = np.zeros(targets.shape[0])
                 cov = np.array([
                     np.cov(
-                        self.parameters[i], 
-                        aweights=self.weighting[i], 
+                        self.parameters[i],
+                        aweights=self.weighting[i],
                         rowvar=False)
                     for i in targets])
                 if self.n_params == 1:
@@ -745,8 +745,8 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                 loc = self.parameters[targets, ϵ_ind:].reshape(
                     (-1, self.n_params))
                 scale = np.repeat(
-                    np.linalg.cholesky(cov), 
-                    to_accept, 
+                    np.linalg.cholesky(cov),
+                    to_accept,
                     axis=0)
                 while a_ind.shape[0] > 0:
                     samples = np.zeros((a_ind.shape[0], self.n_params))
@@ -757,7 +757,7 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                         accepted = np.logical_and(
                             np.all(
                                 np.greater(
-                                    samples[s_ind], 
+                                    samples[s_ind],
                                     self.prior.low),
                                 axis=1),
                             np.all(
@@ -771,7 +771,7 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                     distances = np.diag(distances[:, t_ind])
                     differences = np.vstack([np.diag(differences[:, t_ind, i]) for i in range(self.n_params)]).T
                     accepted = np.less(
-                        distances, 
+                        distances,
                         np.take(ϵ, t_ind))
                     dist[a_ind[accepted]] = distances[accepted]
                     diff[a_ind[accepted]] = differences[accepted]
@@ -794,13 +794,13 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
                 self.num_draws[targets] += iteration_draws
                 bar.update(iteration)
                 bar.set_postfix(criterion=this_criterion, draws=self.num_draws, ϵ=ϵ)
-        
+
     def weighting_norm(self, parameters, means, inverse_covariance, weighting):
         diff = parameters[:, np.newaxis, ...] - means[:, :, np.newaxis, ...]
         exp = -0.5 * np.einsum("ijkl,ilm,ijkm->ijk", diff, inverse_covariance, diff)
         norm = -0.5 * np.log(2. * np.pi * np.linalg.det(inverse_covariance))[:, np.newaxis, np.newaxis]
         return np.sum(np.exp(exp + norm) * weighting[:, :, np.newaxis], 1)
-        
+
     def sort(self, index=None, draws=None):
         indices = self.distances.argsort(axis=1)
         if draws is not None:
@@ -817,18 +817,18 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
             self.differences[index] = np.array([self.differences[i, indices[i]] for i in index])
             self.distances[index] = np.array([self.distances[i, indices[i]] for i in index])
             self.weighting[index] = np.array([self.weighting[i, indices[i]] for i in index])
-        
+
     def setup_points(self, draws=None, initial_draws=None, criterion=None, percentile=75, at_once=True, save_sims=None, **kwargs):
         self.__call__(draws=draws, initial_draws=initial_draws, criterion=criterion, percentile=percentile, at_once=at_once, save_sims=save_sims)
         self.accepted_parameters = self.parameters
         self.accepted_estimates = self.estimates
         self.rejected_parameters = np.array([]).reshape((self.targets, 0))
         self.rejected_estimates = np.array([]).reshape((self.targets, 0))
-            
+
     def scatter_plot(self, draws=None, initial_draws=None, criterion=None, percentile=None, at_once=True, save_sims=None, **kwargs):
         self.setup_points(draws=draws, initial_draws=initial_draws, criterion=criterion, percentile=percentile, at_once=at_once, save_sims=save_sims)
         self._scatter_plot(**kwargs)
-        
+
 class GaussianApproximation(LFI):
     def __init__(self, **kwargs):
         setattr(self, "log_like", None)
@@ -840,22 +840,22 @@ class GaussianApproximation(LFI):
 
     def __call__(self, grid=None, gridsize=20, prior=True):
         self.check_prerun(grid, gridsize, prior)
-            
+
     def log_gaussian(self, grid, shape):
         diff = self.estimate[:, np.newaxis, :] - grid[np.newaxis, ...]
         exp = -0.5 * np.einsum("ijk,kl,ijl->ij", diff, self.Finv, diff)
         norm = -0.5 * np.log(2. * np.pi * np.linalg.det(self.Finv))
         return np.reshape(exp + norm,((-1,) + shape))
-        
+
     def calculate_likelihood(self, grid, shape, prior):
         self.log_like = self.log_gaussian(grid, shape)
         if prior:
             self.log_prior = np.reshape(
-                self.prior.log_prob(grid), 
+                self.prior.log_prob(grid),
                 ((-1,) + shape))
             self.log_post = self.log_like + self.log_prior
         self.grid = np.reshape(grid.T, (-1,) + shape)
-        
+
     def check_prerun(self, grid, gridsize, prior):
         if (self.log_like is not None):
             if grid is not None:
@@ -873,7 +873,7 @@ class GaussianApproximation(LFI):
             else:
                 grid, shape = self.make_grid(gridsize)
                 self.calculate_likelihood(grid, shape, prior)
-        
+
     def check_grid(self, grid):
         if len(grid.shape) == 1:
             this_grid = grid[np.newaxis, :]
@@ -882,7 +882,7 @@ class GaussianApproximation(LFI):
         else:
             this_grid = grid.reshape((self.n_params, -1)).T
         return this_grid, grid[0].shape
-        
+
     def make_grid(self, gridsize):
         gridsize = self.utils.check_gridsize(gridsize, self.n_params)
         parameters = [np.linspace(
@@ -893,23 +893,23 @@ class GaussianApproximation(LFI):
         return self.check_grid(
             np.array(
                 np.meshgrid(*parameters, indexing="ij")))
-        
+
     def log_prob(self, grid=None, gridsize=20):
         self.__call__(grid=grid, gridsize=gridsize, prior=False)
         return self.log_like
-        
+
     def prob(self, grid=None, gridsize=20):
         self.__call__(grid=grid, gridsize=gridsize, prior=False)
         return np.exp(self.log_like)
-    
+
     def log_posterior(self, grid=None, gridsize=20):
         self.__call__(grid=grid, gridsize=gridsize)
         return self.log_post
-    
+
     def posterior(self, grid=None, gridsize=20):
         self.__call__(grid=grid, gridsize=gridsize)
         return np.exp(self.log_post)
-        
+
     def plot(self, grid=None, gridsize=20, **kwargs):
         posterior = self.posterior(grid=grid, gridsize=gridsize)
         return self.triangle_plot(posterior, self.grid, **kwargs)

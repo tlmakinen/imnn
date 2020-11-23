@@ -6,7 +6,7 @@ Docstrings need writing
 """
 
 
-__version__ = '0.2a5'
+__version__ = '0.2dev'
 __author__ = "Tom Charnock"
 
 
@@ -87,6 +87,17 @@ and strength.")
                   "IMNN.filename='save-directory-path';\n" +
                   "IMNN.model.save(IMNN.filename)")
         sys.exit()
+
+    def build_warning(self, trigger):
+        if self.verbose:
+            print("If initialising with `build=False`, pipeline needs " +
+                  "building before being able to fit the network.\n" +
+                  "Run `IMNN.build(input_shape, fiducial, derivative, " +
+                  "validation_fiducial, validation_derivative, {model}, " +
+                  "{optimiser}, {at_once}, {map_fn}, {check_shape}, {load}, " +
+                  "{weights});\n")
+        if trigger:
+            sys.exit()
 
     def check_model(self, model, input_shape, output_shape):
         if not hasattr(model, "input_shape"):

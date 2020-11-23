@@ -9,7 +9,7 @@ Still some docstrings which need finishing
 Use precomputed external covariance and derivatives"""
 
 
-__version__ = '0.2a5'
+__version__ = '0.2dev'
 __author__ = "Tom Charnock"
 
 
@@ -100,18 +100,20 @@ class IMNN:
         coupling strength for the regularisation
     α : TF tensor float ()
         decay rate for the regularisation
+    prebuilt : bool
+        whether to build the datasets and pipeline on initialisation
     history : dict
         history object for saving training statistics.
     iteration : int
         a counter for the number of iterations of fitting
     """
-    def __init__(self, n_s, n_d, n_params, n_summaries, 
-                 θ_fid, δθ, input_shape, fiducial, derivative, 
-                 validation_fiducial, validation_derivative, 
+    def __init__(self, n_s, n_d, n_params, n_summaries,
+                 θ_fid, δθ, input_shape, fiducial, derivative,
+                 validation_fiducial, validation_derivative,
                  model=None, optimiser=tf.keras.optimizers.Adam(),
-                 dtype=tf.float32, itype=tf.int32, save=False, load=False, weights=None, 
-                 verbose=True, directory=None, filename=None, at_once=None, 
-                 map_fn=None, check_shape=True):
+                 dtype=tf.float32, itype=tf.int32, save=False, load=False,
+                 weights=None, verbose=True, directory=None, filename=None,
+                 at_once=None, map_fn=None, check_shape=True, build=True):
         """Initialises attributes and calculates useful constants
 
         Parameters
@@ -167,34 +169,40 @@ class IMNN:
             whether to use verbose outputs in error checking module
         check_shape : bool
             whether to check the shape of the model and the data
+        build : bool
+            whether to build the datasets and pipeline on initialisation
 
         Calls
         _____
-        IMNN.utils.utils.type_checking(any, type, str, opt(str))
+        IMNN.utils.utils.type_checking(any, type, str, {str})
             checks that value exists and is of the correct type
         init_attributes(int, int, int, int, tfdtype, tfdtype, bool, str, bool)
             Initialises all attributes and sets necessary constants
         set_tensors(ndarray, ndarray)
             sets useful tensors which can be precomputed
-        set_data(tuple, ndarray/gen/list, ndarray/gen/list, ndarray/gen/list,
-                 ndarray/gen/list, int, func, bool)
-            builds the datasets and sets the functions to be used to train IMNN
-        set_model(model, optimiser)
-            loads the model and optimiser as attributes
+        build(tuple, ndarray/gen/list, ndarray/gen/list, ndarray/gen/list,
+              ndarray/gen/list, {model}, {optimiser}, {str}, {func}, {bool},
+              {bool}, {list})
+            builds the data pipeline for training and validation
+        IMNN.utils.utils.build_warning(bool)
+            warning and checking for whether IMNN pipeline is built on start
         """
         self.u = utils.utils(verbose=verbose)
         check_shape = self.u.type_checking(check_shape, True, "check_shape")
         self.init_attributes(n_s, n_d, n_params, n_summaries, dtype, itype,
-                             save, filename, directory, verbose)
+                             save, filename, directory, verbose, build)
         self.set_tensors(θ_fid, δθ)
-        self.set_data(input_shape, fiducial, derivative,
-                      validation_fiducial, validation_derivative,
-                      at_once, map_fn, check_shape)
-        load = self.u.type_checking(load, True, "load")
-        self.set_model(model, optimiser, load=load, weights=weights)
+        if self.prebuilt:
+            self.build(input_shape, fiducial, derivative, validation_fiducial,
+                       validation_derivative, model=model, optimiser=optimiser,
+                       at_once=at_once, map_fn=map_fn, check_shape=check_shape,
+                       load=load, weights=weights)
+        else:
+            self.u.build_warning(False)
 
     def init_attributes(self, n_s, n_d, n_params, n_summaries,
-                        dtype, itype, save, filename, directory, verbose):
+                        dtype, itype, save, filename, directory, verbose,
+                        build):
         """Initialises all attributes and sets necessary constants
 
         All attributes are set to None before they are loaded when
@@ -224,6 +232,8 @@ class IMNN:
             directory for loading and saving the model
         verbose : bool
             whether to use verbose outputs in error checking module
+        build : bool
+            whether to build the datasets and pipeline on initialisation
 
         Calls
         _____
@@ -242,8 +252,9 @@ class IMNN:
         self.itype = self.u.type_checking(itype,
                                           tf.int32,
                                           "itype")
-
+        self.prebuilt = self.u.type_checking(build, True, "build")
         self.save = self.u.type_checking(save, True, "save")
+
         if self.save:
             if directory is None:
                 self.directory = "."
@@ -331,6 +342,59 @@ class IMNN:
             "r": [],
         }
 
+    def build(self, input_shape, fiducial, derivative, validation_fiducial,
+              validation_derivative, model=None,
+              optimiser=tf.keras.optimizers.Adam(), at_once=None, map_fn=None,
+              check_shape=True, load=False, weights=None):
+        """Builds data pipeline for training and validation
+
+        Parameters
+        __________
+        input_shape : tuple
+            shape of the input data
+        fiducial : ndarray (n_s,)+input_shape or func or list
+            numpy array containing fiducial data or function returning same
+        derivative : ndarray (n_d, 2, n_params)+input_shape or func
+                or list
+            numpy array containing derivative data or function returning same
+        validation_fiducial : nd_array (n_s,)+input_shape or func
+                or list
+            numpy array containing fiducial data or function returning same
+        validation_derivative : nd_array (n_d, 2, n_params)+input_shape
+                or func or list
+            numpy array containing derivative data or function returning same
+        model : TF model (keras or other)
+            neural network to do the compression defined using TF or keras
+        optimiser : TF optimiser (keras or other)
+            optimisation operation to do weight updates using TF or keras
+        at_once : int
+            number of simulations to process at once if using TF.data.Dataset
+        map_fn : func
+            function for data augmentation when using TF datasets
+        check_shape : bool
+            whether to check the shape of the model and the data
+        load : bool
+            whether to load the model on initialisation
+        weights : str
+            filename for the weights to be loaded
+
+        Calls
+        _____
+        set_data(tuple, ndarray/gen/list, ndarray/gen/list, ndarray/gen/list,
+                 ndarray/gen/list, int, func, bool)
+            builds the datasets and sets the functions to be used to train IMNN
+        IMNN.utils.utils.type_checking(any, type, str, opt(str))
+            checks that value exists and is of the correct type
+        set_model(model, optimiser)
+            loads the model and optimiser as attributes
+        """
+        self.prebuilt = True
+        self.set_data(input_shape, fiducial, derivative,
+                      validation_fiducial, validation_derivative,
+                      at_once, map_fn, check_shape)
+        load = self.u.type_checking(load, True, "load")
+        self.set_model(model, optimiser, load=load, weights=weights)
+
     def set_model(self, model, optimiser, load=False, weights=None):
         """Loads functional neural network and optimiser as attributes
 
@@ -355,7 +419,7 @@ class IMNN:
         if load:
             self.load_model(optimiser, weights=weights)
             self.variables = self.model.get_weights()
-        else:    
+        else:
             self.model = self.u.check_model(model,
                                             self.input_shape,
                                             self.n_summaries)
@@ -363,9 +427,10 @@ class IMNN:
             self.optimiser = optimiser
             if self.save:
                 if self.verbose:
-                    print("saving model to {}".format("/".join((self.directory, self.filename))))
+                    print("saving model to {}".format("/".join((self.directory,
+                        self.filename))))
                 self.model.save("/".join((self.directory, self.filename)))
-                
+
     def update_variables(self, variables):
             """Updates the initial model trainable variables
 
@@ -386,10 +451,12 @@ class IMNN:
         weights : str
             filename for saving weights
         """
-        self.model = tf.keras.models.load_model("/".join((self.directory, self.filename)))
+        self.model = tf.keras.models.load_model("/".join((self.directory,
+            self.filename)))
         self.optimiser = optimiser
         if weights is not None:
-            self.model.load_weights("{}.h5".format("/".join((self.directory, self.filename, weights))))
+            self.model.load_weights("{}.h5".format("/".join((self.directory,
+                self.filename, weights))))
 
     def set_tensors(self, θ_fid, δθ):
         """Makes TF tensors for necessary objects which can be precomputed
@@ -455,12 +522,11 @@ class IMNN:
         simulation : TF Data (float) input_shape
             the simulation to be preprocessed
         indices : TF Data (int) or tuple(int, int, int)
-            the seed (and derivative flag and parameter index of the simulation)
+            the seed (& derivative flag and parameter index of the simulation)
         """
-        
         if map_fn is None:
             return (simulation, indices)
-	return (map_fn(simulation, indices), indices)
+        return (map_fn(simulation), indices)
 
     def set_data(self, input_shape, fiducial, derivative,
                  validation_fiducial, validation_derivative,
@@ -530,6 +596,9 @@ class IMNN:
                     np.zeros(()),
                     (self.n_d, 2, self.n_params) + self.input_shape,
                     "derivative")
+            if map_fn is not None:
+                fiducial = map_fn(fiducial)
+                derivative = map_fn(derivative)
             self.data = tf.convert_to_tensor(fiducial,
                                              dtype=self.dtype)
             self.derivative = tf.convert_to_tensor(derivative,
@@ -594,6 +663,9 @@ class IMNN:
                         np.zeros(()),
                         (self.n_d, 2, self.n_params) + self.input_shape,
                         "validation_derivative")
+                if map_fn is not None:
+                    validation_fiducial = map_fn(validation_fiducial)
+                    validation_derivative = map_fn(validation_derivative)
                 self.validation_data = tf.convert_to_tensor(
                     validation_fiducial,
                     dtype=self.dtype)
@@ -792,12 +864,14 @@ class IMNN:
         """
         if derivative:
             if validate:
-                return self.validation_derivative_dataset, self.get_derivative_indices
+                return self.validation_derivative_dataset, \
+                    self.get_derivative_indices
             else:
                 return self.derivative_dataset, self.get_derivative_indices
         else:
             if validate:
-                return self.validation_fiducial_dataset, self.get_fiducial_indices
+                return self.validation_fiducial_dataset, \
+                    self.get_fiducial_indices
             else:
                 return self.fiducial_dataset, self.get_fiducial_indices
 
@@ -1459,24 +1533,25 @@ class IMNN:
         return tf.add(
             self.θ_fid,
             tf.einsum(
-                "ij,jk,kl,ml->mi", 
-                self.Finv, 
-                self.dμ_dθ, 
+                "ij,jk,kl,ml->mi",
+                self.Finv,
+                self.dμ_dθ,
                 self.Cinv,
                 tf.subtract(
                     self.model(d),
                     self.μ)))
-    
+
     def save_estimator(self, filename):
         """Save the parameters necessary to make an estimate using the IMNN
-        
+
         Parameters
         __________
         filename : str
             filename to save the estimator parameters
         """
-        np.savez(filename, Finv=np.linalg.inv(self.F.numpy()), θ_fid=self.θ_fid,
-                 dμ_dθ=self.dμ_dθ.numpy(), Cinv=self.Cinv.numpy(), μ=self.μ.numpy())
+        np.savez(filename, Finv=np.linalg.inv(self.F.numpy()),
+            θ_fid=self.θ_fid, dμ_dθ=self.dμ_dθ.numpy(), Cinv=self.Cinv.numpy(),
+            μ=self.μ.numpy())
 
     def fit(self, n_iterations=None, λ=10., ϵ=0.01, reset=False,
             patience=None, checkpoint=None, min_iterations=None,
@@ -1517,6 +1592,9 @@ class IMNN:
             checks whether IMNN being trained in jupyter notebook
 
         """
+        if not self.prebuilt:
+            self.u.build_warning(True)
+
         if reset:
             self.history = self.initialise_history()
             self.model.set_weights(self.variables)
@@ -1525,7 +1603,7 @@ class IMNN:
             total = float("inf")
         else:
             total = n_iterations
-        
+
         self.get_regularisation_rate(λ, ϵ)
 
         if checkpoint is not None:
@@ -1560,9 +1638,11 @@ class IMNN:
             calculate_patience = False
 
         if self.u.isnotebook(tqdm_notebook):
-            bar = tqdm.tqdm_notebook(range(n_iterations), total=total, desc="Iterations")
+            bar = tqdm.tqdm_notebook(range(n_iterations), total=total,
+                desc="Iterations")
         else:
-            bar = tqdm.tqdm(range(n_iterations), total=total, desc="Iterations")
+            bar = tqdm.tqdm(range(n_iterations), total=total,
+                desc="Iterations")
         for iterations in bar:
             self.iteration += 1
             self.F, self.C, self.Cinv, self.μ, self.dμ_dθ, self.reg, self.r = \
@@ -1599,11 +1679,12 @@ class IMNN:
                         if patience_counter > patience:
                             print("Reached {} steps without increasing {}. "
                                   "Resetting weights to iteration {}.".format(
-                                      patience, patience_criterion, this_iteration))
+                                      patience, patience_criterion,
+                                      this_iteration))
                             self.model.set_weights(weights)
                             self.F, self.C, self.Cinv, self.μ, self.dμ_dθ = \
-                                self.validater(self.F, self.C, self.Cinv, self.μ,
-                                   self.dμ_dθ, validate=True)
+                                self.validater(self.F, self.C, self.Cinv,
+                                    self.μ, self.dμ_dθ, validate=True)
                             break
                         else:
                             patience_counter += 1
@@ -1632,14 +1713,15 @@ class IMNN:
                 (self.directory, self.filename, weight_file))))
             self.save_estimator("{}.npz".format("/".join(
                 (self.directory, self.filename, "estimator"))))
-            
-            
+
+
     def plot(self, regulariser=True, known_det_fisher=None, figsize=(10, 15)):
         import matplotlib.pyplot as plt
         if regulariser:
             fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize)
         else:
-            fig, ax = plt.subplots(2, 1, sharex=True, figsize=(figsize[0], figsize[1] * 2 / 3))
+            fig, ax = plt.subplots(2, 1, sharex=True, figsize=(figsize[0],
+                figsize[1] * 2 / 3))
         plt.subplots_adjust(hspace=0)
         epochs = np.arange(1, len(self.history["det_F"]) + 1)
         ax[0].plot(epochs, self.history["det_F"], color="C0",
@@ -1647,7 +1729,7 @@ class IMNN:
         ax[0].plot(epochs, self.history["val_det_F"], color="C1",
            label=r'$|{\bf F}_{\alpha\beta}|$ from validation data')
         if known_det_fisher is not None:
-            ax[0].axhline(known_det_fisher, color="black", 
+            ax[0].axhline(known_det_fisher, color="black",
                           linestyle="dashed")
         ax[0].legend(frameon=False)
         ax[0].set_xlim([1, epochs[-1]])
@@ -1657,9 +1739,9 @@ class IMNN:
         ax[1].plot(epochs, self.history["val_det_C"], color="C1",
            label=r'$|{\bf C}|$ from validation data')
         ax[1].plot(epochs, self.history["det_Cinv"], color="C0",
-                   linestyle="dashed", 
+                   linestyle="dashed",
                    label=r'$|{\bf C}^{-1}|$ from training data')
-        ax[1].plot(epochs, self.history["val_det_Cinv"], color="C1", 
+        ax[1].plot(epochs, self.history["val_det_Cinv"], color="C1",
                    linestyle="dashed",
                    label=r'$|{\bf C}^{-1}|$ from validation data')
         ax[1].axhline(1., color="black", linestyle="dashed")
