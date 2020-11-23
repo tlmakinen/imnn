@@ -1,6 +1,6 @@
 import setuptools
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
@@ -11,7 +11,7 @@ setuptools.setup(
     description="Using neural networks to extract sufficient statistics from \
         data by maximising the Fisher information",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/reStructuredText",
     url="https://github.com/tomcharnock/IMNN.git",
     packages=["IMNN", "IMNN.LFI", "IMNN.utils"],
     classifiers=[
