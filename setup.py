@@ -25,5 +25,6 @@ setuptools.setup(
           "tqdm>=4.31.0",
           "numpy>=1.16.0",
           "scipy>=1.4.1",
-          "matplotlib"],
+          "matplotlib",
+          "itertools"],
 )

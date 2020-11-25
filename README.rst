@@ -87,7 +87,7 @@ The basic call for the IMNN is
       fiducial, derivative, validation_fiducial, validation_derivative,
       {model}, {optimiser}, {save}, {load}, {weights}, {directory},
       {filename}, {at_once}, {map_fn}, {check_shape}, {verbose},
-      {dtype}, {itype})
+      {dtype}, {itype}, {build})
 
 where
 
@@ -115,6 +115,7 @@ where
  - ``verbose`` - boolean to turn on and off descriptive write out
  - ``dtype`` - TensorFlow float type (default ``tf.float32``)
  - ``itype`` - TensorFlow int type (default ``tf.int32``)
+ - ``build`` - boolean whether to build on initialisation or not
 
 ---
 Fit

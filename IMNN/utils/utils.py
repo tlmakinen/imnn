@@ -170,6 +170,19 @@ for derivatives")
             print("input shape will be " + str(value))
         return value
 
+    def check_map_fn(self, value, fast=False):
+        if value is not None:
+            if not callable(value):
+                if self.verbose:
+                    print("map_fn is not None but is not callable.")
+                sys.exit()
+            if fast:
+                if self.verbose:
+                    print("map_fn is not currently implemented when loading " +
+                          "data in memory.")
+                sys.exit()
+
+
     def isnotebook(self, tqdm_notebook):
         tqdm_notebook = self.type_checking(tqdm_notebook, True,
                                            "tqdm_notebook")

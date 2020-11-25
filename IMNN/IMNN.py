@@ -16,6 +16,7 @@ __author__ = "Tom Charnock"
 import tensorflow as tf
 import numpy as np
 import tqdm
+import itertools
 from IMNN.utils import utils
 
 
@@ -104,8 +105,6 @@ class IMNN:
         whether to build the datasets and pipeline on initialisation
     history : dict
         history object for saving training statistics.
-    iteration : int
-        a counter for the number of iterations of fitting
     """
     def __init__(self, n_s, n_d, n_params, n_summaries,
                  θ_fid, δθ, input_shape, fiducial, derivative,
@@ -311,8 +310,6 @@ class IMNN:
         self.α = None
         self.identity = None
 
-        self.iteration = None
-
     def initialise_history(self):
         """Sets up dictionary of lists for collecting training diagnostics
 
@@ -514,20 +511,6 @@ class IMNN:
             dtype=self.dtype,
             name="derivative_steps")
 
-    def map_fn(self, simulation, indices, map_fn=None):
-        """An internalised function for alling map_fn with IMNN attributes
-
-        Parameters
-        __________
-        simulation : TF Data (float) input_shape
-            the simulation to be preprocessed
-        indices : TF Data (int) or tuple(int, int, int)
-            the seed (& derivative flag and parameter index of the simulation)
-        """
-        if map_fn is None:
-            return (simulation, indices)
-        return (map_fn(simulation), indices)
-
     def set_data(self, input_shape, fiducial, derivative,
                  validation_fiducial, validation_derivative,
                  at_once, map_fn, check_shape):
@@ -585,6 +568,7 @@ class IMNN:
         self.input_shape = self.u.check_input(input_shape)
         if ((type(fiducial) is np.ndarray) and
                 (type(derivative) is np.ndarray)):
+            self.u.check_map_fn(map_fn, fast=True)
             if check_shape:
                 fiducial = self.u.check_shape(
                     fiducial,
@@ -596,9 +580,6 @@ class IMNN:
                     np.zeros(()),
                     (self.n_d, 2, self.n_params) + self.input_shape,
                     "derivative")
-            if map_fn is not None:
-                fiducial = map_fn(fiducial)
-                derivative = map_fn(derivative)
             self.data = tf.convert_to_tensor(fiducial,
                                              dtype=self.dtype)
             self.derivative = tf.convert_to_tensor(derivative,
@@ -606,6 +587,7 @@ class IMNN:
             fast = True
             self.trainer = self.fast_train
         elif callable(fiducial) and callable(derivative):
+            self.u.check_map_fn(map_fn)
             self.fiducial_at_once, self.derivative_at_once = \
                 self.u.at_once_checker(at_once, self.n_s, self.n_d,
                                        self.n_params)
@@ -626,21 +608,28 @@ class IMNN:
                 del(temp_data, _)
             self.fiducial_dataset = self.build_dataset(fiducial,
                                                        derivative=False,
+                                                       validation=False,
                                                        map_fn=map_fn)
             self.derivative_dataset = self.build_dataset(derivative,
                                                          derivative=True,
+                                                         validation=False,
                                                          map_fn=map_fn)
             fast = False
             self.trainer = self.scatter
         elif ((type(fiducial) == list)
                 and (type(derivative) == list)):
+            self.u.check_map_fn(map_fn)
             self.fiducial_at_once, self.derivative_at_once = \
                 self.u.at_once_checker(at_once, self.n_s, self.n_d,
                                        self.n_params)
             self.fiducial_dataset = self.build_tfrecord(fiducial,
-                                                        derivative=False)
+                                                        derivative=False,
+                                                        validation=False,
+                                                        map_fn=map_fn)
             self.derivative_dataset = self.build_tfrecord(derivative,
-                                                          derivative=True)
+                                                          derivative=True,
+                                                          validation=False,
+                                                          map_fn=map_fn)
             fast = False
             self.trainer = self.scatter
         else:
@@ -663,9 +652,6 @@ class IMNN:
                         np.zeros(()),
                         (self.n_d, 2, self.n_params) + self.input_shape,
                         "validation_derivative")
-                if map_fn is not None:
-                    validation_fiducial = map_fn(validation_fiducial)
-                    validation_derivative = map_fn(validation_derivative)
                 self.validation_data = tf.convert_to_tensor(
                     validation_fiducial,
                     dtype=self.dtype)
@@ -679,10 +665,12 @@ class IMNN:
                 self.validation_fiducial_dataset = self.build_dataset(
                     validation_fiducial,
                     derivative=False,
+                    validation=True,
                     map_fn=map_fn)
                 self.validation_derivative_dataset = self.build_dataset(
                     validation_derivative,
                     derivative=True,
+                    validation=True,
                     map_fn=map_fn)
                 self.validater = self.scatter
             elif ((not fast) and
@@ -690,10 +678,14 @@ class IMNN:
                     (type(derivative) == list)):
                 self.validation_fiducial_dataset = self.build_tfrecord(
                     validation_fiducial,
-                    derivative=False)
+                    derivative=False,
+                    validation=True,
+                    map_fn=map_fn)
                 self.validation_derivative_dataset = self.build_tfrecord(
                     validation_derivative,
-                    derivative=True)
+                    derivative=True,
+                    validation=True,
+                    map_fn=map_fn)
                 self.validater = self.scatter
             else:
                 self.u.data_error(validate=True)
@@ -703,7 +695,7 @@ class IMNN:
         else:
             self.u.data_error(validation=True)
 
-    def build_dataset(self, loader, derivative, map_fn):
+    def build_dataset(self, loader, derivative, validation, map_fn=None):
         """Build tf.data.Dataset for the necessary datasets
 
         Parameters
@@ -712,9 +704,24 @@ class IMNN:
             a generator which returns the data and indices used to select it
         derivative : bool
             whether the dataset is for the fiducial or derivative data
+        validation : bool
+            whether the dataset is for the validation set of the training set
         map_fn : func
             a function taking a datum and augmenting it as part of the pipeline
+
+        Returns
+        _______
+        dataset : iter
+            an iterator of the entire dataset
         """
+
+        counter = tf.data.Dataset.from_generator(
+            self.step_counter, self.itype, tf.TensorShape([]))
+
+        if not validation:
+            counter = counter.flat_map(lambda seed :
+                tf.data.Dataset.from_tensors(seed).repeat(2))
+
         if derivative:
             size = self.n_d
             at_once = self.derivative_at_once
@@ -745,7 +752,8 @@ class IMNN:
                     (tf.TensorShape(self.input_shape), (tf.TensorShape(None),
                      tf.TensorShape(None), tf.TensorShape(None))),
                     args=(x, y, z)),
-                num_parallel_calls=tf.data.experimental.AUTOTUNE)
+                num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                deterministic=True)
         else:
             dataset = dataset.interleave(
                 lambda x: tf.data.Dataset.from_generator(
@@ -753,14 +761,23 @@ class IMNN:
                     (self.dtype, self.itype),
                     (tf.TensorShape(self.input_shape), tf.TensorShape(None)),
                     args=(x,)),
-                num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        if map_fn is not None:
-            dataset = dataset.map(
-                lambda data, indices:
-                    self.map_fn(data, indices, map_fn=map_fn))
+                num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                deterministic=True)
         dataset = dataset.batch(at_once)
+        dataset = dataset.cache()
+
+        dataset = counter.flat_map(lambda seed: tf.data.Dataset.zip((
+            dataset,
+            tf.data.Dataset.from_tensors(seed).repeat().batch(at_once))))
+
+        if map_fn is not None:
+            dataset = dataset.unbatch()
+            dataset = dataset.map(lambda data, seed : (
+                map_fn(data[0], data[1], seed), seed))
+            dataset = dataset.batch(at_once)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
-        return dataset.cache()
+
+        return iter(dataset)
 
     def fiducial_parser(self, example):
         """Parses the data from the .tfrecord byte stream
@@ -820,7 +837,17 @@ class IMNN:
         parameter = tf.cast(parsed_example["parameter"], self.itype)
         return data, (index, derivative, parameter)
 
-    def build_tfrecord(self, loader, derivative):
+    def step_counter(self):
+        """Generator to provide an iteration counter to datasets
+
+        Returns
+        _______
+        i : int
+            an itertools infinite generator counter
+        """
+        for i in itertools.count(): yield i
+
+    def build_tfrecord(self, loader, derivative, validation, map_fn=None):
         """Build tf.data.Dataset from the list of .tfrecord files
 
         Parameters
@@ -829,7 +856,19 @@ class IMNN:
             filenames for the tfrecord
         derivative : bool
             whether the dataset is for the fiducial or derivative data
+        validation : bool
+            whether the dataset is for the validation set of the training set
+        map_fn : func
+            a function taking a datum and augmenting it as part of the pipeline
         """
+
+        counter = tf.data.Dataset.from_generator(
+            self.step_counter, self.itype, tf.TensorShape([]))
+
+        if not validation:
+            counter = counter.flat_map(lambda seed :
+                tf.data.Dataset.from_tensors(seed).repeat(2))
+
         if derivative:
             at_once = self.derivative_at_once
             parser = self.derivative_parser
@@ -841,9 +880,22 @@ class IMNN:
             filenames=loader,
             num_parallel_reads=tf.data.experimental.AUTOTUNE)
         dataset = dataset.map(parser)
+
         dataset = dataset.batch(at_once)
+        dataset = dataset.cache()
+
+        dataset = counter.flat_map(lambda seed: tf.data.Dataset.zip((
+            dataset,
+            tf.data.Dataset.from_tensors(seed).repeat().batch(at_once))))
+
+        if map_fn is not None:
+            dataset = dataset.unbatch()
+            dataset = dataset.map(lambda data, seed : (
+                map_fn(data[0], data[1], seed), seed))
+            dataset = dataset.batch(at_once)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
-        return dataset.cache()
+
+        return iter(dataset)
 
     def set_dataset(self, derivative, validate):
         """Grabs the necessary dataset and the function to create indices
@@ -865,15 +917,19 @@ class IMNN:
         if derivative:
             if validate:
                 return self.validation_derivative_dataset, \
-                    self.get_derivative_indices
+                    self.get_derivative_indices, \
+                    self.n_d * 2 * self.n_params // self.derivative_at_once
             else:
-                return self.derivative_dataset, self.get_derivative_indices
+                return self.derivative_dataset, self.get_derivative_indices, \
+                    self.n_d * 2 * self.n_params // self.derivative_at_once
         else:
             if validate:
                 return self.validation_fiducial_dataset, \
-                    self.get_fiducial_indices
+                    self.get_fiducial_indices, \
+                    self.n_d // self.fiducial_at_once
             else:
-                return self.fiducial_dataset, self.get_fiducial_indices
+                return self.fiducial_dataset, self.get_fiducial_indices, \
+                    self.n_d // self.fiducial_at_once
 
     def get_fiducial_indices(self, index):
         """Constructs the mesh of indices for scattering fiducial summaries
@@ -949,13 +1005,15 @@ class IMNN:
         get_derivative_indices((tf.int, tf.int, tf.int))
             returns the mesh of indices for scattering derivative summaries
         """
-        dataset, get_indices = self.set_dataset(derivative, validate)
-        for data, index in dataset:
-            indices = get_indices(index)
+        dataset, get_indices, loops = self.set_dataset(derivative, validate)
+        for loop in range(loops):
+        #for data, index in dataset:
+            data, seed = next(dataset)
+            indices = get_indices(data[1])
             x = tf.tensor_scatter_nd_update(
                 x,
                 indices,
-                self.model(data))
+                self.model(data[0]))
         return x
 
     def get_covariance(self, x):
@@ -1256,13 +1314,16 @@ class IMNN:
         set_dataset(bool, bool)
             returns dataset and index making function for training/validation
         """
-        dataset, get_indices = self.set_dataset(derivative, validate=False)
+        dataset, get_indices, loops = self.set_dataset(derivative,
+            validate=False)
         gradient = tuple(tf.zeros(variable.shape)
                          for variable in self.model.variables)
-        for data, index in dataset:
-            indices = get_indices(index)
+        for loop in range(loops):
+            data, seed = next(dataset)
+        #for data, index in dataset:
+            indices = get_indices(data[1])
             with tf.GradientTape() as tape:
-                x = self.model(data)
+                x = self.model(data[0])
             batch_gradient = tape.gradient(
                 x,
                 self.model.variables,
@@ -1625,7 +1686,6 @@ class IMNN:
             weights = self.model.get_weights()
             patience_counter = 0
             this_iteration = 0
-            self.iteration = 0
             calculate_patience = True
             min_reached = False
             if min_iterations is None:
@@ -1644,7 +1704,6 @@ class IMNN:
             bar = tqdm.tqdm(range(n_iterations), total=total,
                 desc="Iterations")
         for iterations in bar:
-            self.iteration += 1
             self.F, self.C, self.Cinv, self.μ, self.dμ_dθ, self.reg, self.r = \
                 self.trainer(self.F, self.C, self.Cinv, self.μ, self.dμ_dθ,
                              self.reg, self.r)
