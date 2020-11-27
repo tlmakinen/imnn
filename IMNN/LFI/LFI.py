@@ -127,7 +127,6 @@ class LFI():
             contours = []
             for level in levels:
                 contours.append(array[np.argmin(np.abs(cdf - level))])
-                print(contours[-1])
             contours = np.unique(contours)
         else:
             contours = array[np.argmin(np.abs(cdf - levels))]
