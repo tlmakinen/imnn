@@ -121,12 +121,13 @@ class LFI():
         return a
 
     def levels(self, array, levels):
-        array = np.sort(array.flatten())
+        array = np.sort(array.flatten())[::-1]
         cdf = np.cumsum(array / np.sum(array))
         if type(levels) == list:
             contours = []
             for level in levels:
                 contours.append(array[np.argmin(np.abs(cdf - level))])
+                print(contours[-1])
             contours = np.unique(contours)
         else:
             contours = array[np.argmin(np.abs(cdf - levels))]
