@@ -843,7 +843,7 @@ class GaussianApproximation(LFI):
 
     def log_gaussian(self, grid, shape):
         diff = self.estimate[:, np.newaxis, :] - grid[np.newaxis, ...]
-        exp = -0.5 * np.einsum("ijk,kl,ijl->ij", diff, self.Finv, diff)
+        exp = -0.5 * np.einsum("ijk,kl,ijl->ij", diff, self.F, diff)
         norm = -0.5 * np.log(2. * np.pi * np.linalg.det(self.Finv))
         return np.reshape(exp + norm,((-1,) + shape))
 
