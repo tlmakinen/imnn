@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import tensorflow_probability as tfp
 
 import sys,os
+import pickle
 
 tfd = tfp.distributions
 
@@ -68,6 +69,11 @@ def run_vanilla_one_nofg(filename, θ_fid = np.array([2.0]), n_sims=10000):
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=True, checkpoint=100)
 
+    outfile = './' + filename + '/history'
+    with open(outfile, 'wb') as file_pi:
+         pickle.dump(imnn.history, file_pi)     
+         file_pi.close()
+
     # do population monte carlo sampling using trained model
 
 
@@ -109,6 +115,11 @@ def run_vanilla_one_fg(filename, n_sims=10000):
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=False, checkpoint=100) 
 
+    outfile = './' + filename + '/history'
+    with open(outfile, 'wb') as file_pi:
+         pickle.dump(imnn.history, file_pi)     
+         file_pi.close()
+
 
 def run_cosmo_fg(filename, θ_fid = np.array([2.0, 0.8]), θ_fg = np.array([1.8, 3.2]), n_sims=10000):
 
@@ -149,9 +160,10 @@ def run_cosmo_fg(filename, θ_fid = np.array([2.0, 0.8]), θ_fg = np.array([1.8,
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=False, checkpoint=100) 
 
-
-
-
+    outfile = './' + filename + '/history'
+    with open(outfile, 'wb') as file_pi:
+         pickle.dump(imnn.history, file_pi)     
+         file_pi.close()
 
 
 if __name__ == '__main__':
