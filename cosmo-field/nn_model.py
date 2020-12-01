@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 def field2Dmodel(input_shape, n_summaries, strides=2, kernel=3,
-                growth_factor=2, filters=8, dense_size=2):
+                growth_factor=2, filters=8, dense_size=1):
     s = strides
     k = kernel
     growth_factor = growth_factor
@@ -22,10 +22,10 @@ def field2Dmodel(input_shape, n_summaries, strides=2, kernel=3,
         # update tensor size
         size //= growth_factor
 
-    # add dense layer to final output
+    # add final Conv2D layer to final output
     layers += [
-        tf.keras.layers.Reshape((filters*size*s,)),
-         tf.keras.layers.Dense(n_summaries)
+     tf.keras.layers.Conv2D(SN.n_summaries, kernel_size=(1, 1), strides=(1, 1), padding="valid"),
+     tf.keras.layers.Flatten()
     ]
 
     return tf.keras.Sequential(layers)
