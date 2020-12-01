@@ -24,7 +24,7 @@ def field2Dmodel(input_shape, n_summaries, strides=2, kernel=3,
 
     # add final Conv2D layer to final output
     layers += [
-     tf.keras.layers.Conv2D(SN.n_summaries, kernel_size=(1, 1), strides=(1, 1), padding="valid"),
+     tf.keras.layers.Conv2D(n_summaries, kernel_size=(1, 1), strides=(1, 1), padding="valid"),
      tf.keras.layers.Flatten()
     ]
 
