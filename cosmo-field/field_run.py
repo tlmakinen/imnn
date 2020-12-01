@@ -41,7 +41,7 @@ def run_vanilla_one_nofg(filename, θ_fid = np.array([2.0]), n_sims=10000):
     θ_fg = None
     print('running test IMNN training on amp + fg \nθ_fid ={}, θ_fg={}'.format(θ_fid, θ_fg))
 
-    SN = GenerateCosmoFieldOneParam(n_s=10, n_d=10, n_params=1, n_summaries=1, 
+    SN = GenerateCosmoFieldOneParam(n_s=n_sims, n_d=n_sims, n_params=1, n_summaries=1, 
                 input_shape=(1,128,128), θ_fid=θ_fid, θ_fg=None)
 
     # FOR NOW: load data in-memory (until Tom finishes fast directory loader)
@@ -69,7 +69,7 @@ def run_vanilla_one_nofg(filename, θ_fid = np.array([2.0]), n_sims=10000):
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=True, checkpoint=100)
 
-    outfile = './' + filename + '/history'
+    outfile = './model/' + filename + '/history'
     with open(outfile, 'wb') as file_pi:
          pickle.dump(imnn.history, file_pi)     
          file_pi.close()
@@ -86,7 +86,7 @@ def run_vanilla_one_fg(filename, n_sims=10000):
     print('running test IMNN training on amp + fg \nθ_fid ={}, θ_fg={}'.format(θ_fid, θ_fg))
     print('saving to model directory %s'%(filename))
     
-    SN = GenerateCosmoFieldOneParam(n_s=10, n_d=10, n_params=1, n_summaries=1, 
+    SN = GenerateCosmoFieldOneParam(n_s=n_sims, n_d=n_sims, n_params=1, n_summaries=1, 
                 input_shape=(1,128,128), θ_fid=θ_fid, θ_fg=θ_fg)
 
 
@@ -115,7 +115,7 @@ def run_vanilla_one_fg(filename, n_sims=10000):
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=False, checkpoint=100) 
 
-    outfile = './' + filename + '/history'
+    outfile = './model/' + filename + '/history'
     with open(outfile, 'wb') as file_pi:
          pickle.dump(imnn.history, file_pi)     
          file_pi.close()
@@ -160,7 +160,7 @@ def run_cosmo_fg(filename, θ_fid = np.array([2.0, 0.8]), θ_fg = np.array([1.8,
 
     imnn.fit(patience=10, min_iterations=5000, tqdm_notebook=False, checkpoint=100) 
 
-    outfile = './' + filename + '/history'
+    outfile = './model/' + filename + '/history'
     with open(outfile, 'wb') as file_pi:
          pickle.dump(imnn.history, file_pi)     
          file_pi.close()
