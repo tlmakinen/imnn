@@ -4,7 +4,8 @@ This module provides the methods necessary to perform various ABC methods using 
 
 TODO
 ____
-The documentation for this module is not complete, and stability may be patchy (hopefully not). If you find any problems please push an issue to the GitHub.
+- The documentation for this module is not complete, and stability may be patchy (hopefully not). If you find any problems please push an issue to the BitBucket.
+- The normalisation of posteriors currently doesn't take in to account posteriors which are cut by the prior range.
 """
 
 

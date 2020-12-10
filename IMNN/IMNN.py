@@ -110,7 +110,7 @@ class IMNN:
                  θ_fid, δθ, input_shape, fiducial, derivative,
                  validation_fiducial, validation_derivative,
                  model=None, optimiser=tf.keras.optimizers.Adam(),
-                 dtype=tf.float32, itype=tf.int32, save=False, load=False,
+                 dtype=tf.float32, itype=tf.int64, save=False, load=False,
                  weights=None, verbose=True, directory=None, filename=None,
                  at_once=None, map_fn=None, check_shape=True, build=True):
         """Initialises attributes and calculates useful constants
@@ -715,8 +715,9 @@ class IMNN:
             an iterator of the entire dataset
         """
 
-        counter = tf.data.Dataset.from_generator(
-            self.step_counter, self.itype, tf.TensorShape([]))
+        #counter = tf.data.Dataset.from_generator(
+        #    self.step_counter, self.itype, tf.TensorShape([]))
+        counter = tf.data.Dataset.range(tf.cast(1e10, self.itype))
 
         if not validation:
             counter = counter.flat_map(lambda seed :
@@ -837,15 +838,15 @@ class IMNN:
         parameter = tf.cast(parsed_example["parameter"], self.itype)
         return data, (index, derivative, parameter)
 
-    def step_counter(self):
-        """Generator to provide an iteration counter to datasets
-
-        Returns
-        _______
-        i : int
-            an itertools infinite generator counter
-        """
-        for i in itertools.count(): yield i
+    #def step_counter(self):
+    #    """Generator to provide an iteration counter to datasets
+    #
+    #    Returns
+    #    _______
+    #    i : int
+    #        an itertools infinite generator counter
+    #    """
+    #    for i in itertools.count(): yield i
 
     def build_tfrecord(self, loader, derivative, validation, map_fn=None):
         """Build tf.data.Dataset from the list of .tfrecord files
@@ -862,8 +863,9 @@ class IMNN:
             a function taking a datum and augmenting it as part of the pipeline
         """
 
-        counter = tf.data.Dataset.from_generator(
-            self.step_counter, self.itype, tf.TensorShape([]))
+        #counter = tf.data.Dataset.from_generator(
+        #    self.step_counter, self.itype, tf.TensorShape([]))
+        counter = tf.data.Dataset.range(tf.cast(1e10, self.itype))
 
         if not validation:
             counter = counter.flat_map(lambda seed :
@@ -1006,15 +1008,26 @@ class IMNN:
             returns the mesh of indices for scattering derivative summaries
         """
         dataset, get_indices, loops = self.set_dataset(derivative, validate)
-        for loop in range(loops):
-        #for data, index in dataset:
+
+        def cond(x, loop_counter):
+            return tf.less(loop_counter, loops)
+
+        def body(x, loop_counter):
             data, seed = next(dataset)
             indices = get_indices(data[1])
             x = tf.tensor_scatter_nd_update(
-                x,
-                indices,
-                self.model(data[0]))
-        return x
+                x, indices, self.model(data[0]))
+            return (x, loop_counter+1)
+        return tf.while_loop(cond, body, (x, 0))[0]
+        ##for loop in range(loops):
+        #for data, seed in dataset:
+        #    #data, seed = next(dataset)
+        #    indices = get_indices(data[1])
+        #    x = tf.tensor_scatter_nd_update(
+        #        x,
+        #        indices,
+        #        self.model(data[0]))
+        #return x
 
     def get_covariance(self, x):
         """Calculates covariance, mean and difference of mean from summaries
@@ -1316,11 +1329,12 @@ class IMNN:
         """
         dataset, get_indices, loops = self.set_dataset(derivative,
             validate=False)
-        gradient = tuple(tf.zeros(variable.shape)
-                         for variable in self.model.variables)
-        for loop in range(loops):
+
+        def cond(gradient, loop_counter):
+            return tf.less(loop_counter, loops)
+
+        def body(gradient, loop_counter):
             data, seed = next(dataset)
-        #for data, index in dataset:
             indices = get_indices(data[1])
             with tf.GradientTape() as tape:
                 x = self.model(data[0])
@@ -1331,7 +1345,27 @@ class IMNN:
             gradient = tuple(
                 tf.add(batch_gradient[variable], gradient[variable])
                 for variable in range(len(self.model.variables)))
-        return gradient
+            return (gradient, loop_counter+1)
+
+        #dataset, get_indices = self.set_dataset(derivative, validate=False)
+        gradient = tuple(tf.zeros(variable.shape)
+                         for variable in self.model.variables)
+        return tf.while_loop(cond, body, (gradient, 0))[0]
+
+        #for loop in range(loops):
+        #    data, seed = next(dataset)
+        #for data, seed in dataset:
+        #    indices = get_indices(data[1])
+        #    with tf.GradientTape() as tape:
+        #        x = self.model(data[0])
+        #    batch_gradient = tape.gradient(
+        #        x,
+        #        self.model.variables,
+        #        output_gradients=tf.gather_nd(dΛdx, indices))
+        #    gradient = tuple(
+        #        tf.add(batch_gradient[variable], gradient[variable])
+        #        for variable in range(len(self.model.variables)))
+        #return gradient
 
     @tf.function
     def scatter(self, F, C, Cinv, μ, dμ_dθ, reg=None, r=None, validate=False):
