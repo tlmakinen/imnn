@@ -1,18 +1,15 @@
 __author__="Tom Charnock"
 __version__="0.3dev"
 
-from functools import partial
 import jax
 import jax.numpy as np
 import sys
 import matplotlib.pyplot as plt
+from functools import partial
 
 class IMNN:
-    def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, key, model,
-                 optimiser, simulator=None, fiducial=None, derivative=None,
-                 validation_fiducial=None, validation_derivative=None,
-                 numerical_derivative=False, δθ=None, n_statistics=None,
-                 compression=None):
+    def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, model,
+                 optimiser, key):
         self.n_s = n_s
         self.n_d = n_d
         self.n_summaries = n_summaries
@@ -35,14 +32,6 @@ class IMNN:
         self.μ = None
         self.dμ_dθ = None
 
-        self.simulator = simulator
-        if self.simulator is None:
-            self.simulate = False
-            print("no simulator")
-            sys.exit()
-        else:
-            self.simulate = True
-
         self.history = {
             "detF": np.zeros((0,)),
             "detC": np.zeros((0,)),
@@ -51,59 +40,6 @@ class IMNN:
             "r": np.zeros((0,)),
             "max_detF": 0.
         }
-
-        '''
-        self.fiducial = fiducial
-        self.derivative = derivative
-        self.validation_fiducial = validation_fiducial
-        self.validation_derivative = validation_derivative
-
-        if self.simulator is None:
-            if (self.fiducial is None) or (self.derivative is None):
-                print("`fiducial` and `derivative` arrays must be supplied " +
-                      "if not using a differentiable `simulator`")
-                sys.exit()
-            else:
-                if ((self.validation_fiducial is not None)
-                        and (self.validation_derivation is not None):
-                    self.validate = True
-                elif ((self.validation_fiducial is None)
-                        and (self.validation_derivative is None)):
-                    self.validate = False
-                else:
-                    if self.validation_fiducial is not None:
-                        print("`validation_fiducial` is supplied but " +
-                              "`validation_derivative` is missing")
-                        sys.exit()
-                    else:
-                        print("`validation_derivative` is supplied but " +
-                              "`validation_fiducial` is missing")
-                        sys.exit()
-            self.simulate = False
-        else:
-            self.simulate = False
-
-        self.n_statistics = n_statistics
-        self.compression = compression
-        if self.n_statistics is not None:
-            if (self.compression is None) and (self.):
-                print("`compression` function is necessary when supplying" +
-                      "external statistics (`n_statistics`)")
-                sys.exit()
-            else:
-                self.statistics = True
-        elif self.compression is not None:
-            if self.n_statistics is None:
-                print("`n_statistics` is necessary when supplying" +
-                      "`compression` function")
-                sys.exit()
-            else:
-                self.statistics = True
-        else:
-            self.statistics = False
-
-        print("")
-        '''
 
     def fit(self, λ, α, rng=None, patience=100,
             min_iterations=1000, max_iterations=int(1e5)):
@@ -141,6 +77,9 @@ class IMNN:
         self.set_F_statistics(
             rng, self.final_w, self.θ_fid, self.n_s, self.n_d)
 
+    def get_fitting_keys(self, rng):
+        return None, None, None
+
     @partial(jax.jit, static_argnums=(0, 12, 13, 14, 15, 16))
     def _fit(self,
         state, max_detF, best_w, detF, detC, detinvC, Λ2, r, counter,
@@ -168,12 +107,7 @@ class IMNN:
                 return (patience_counter, counter, detF, max_detF, w, best_w)
             state, max_detF, best_w, detF, detC, detinvC, Λ2, r, \
                 counter, patience_counter, rng = inputs
-            if self.simulate:
-                rng, training_key, validation_key = \
-                    jax.random.split(rng, num=3)
-            else:
-                training_key = None
-                validation_key = None
+            rng, training_key, validation_key = self.get_fitting_keys(rng)
             w = self.get_parameters(state)
             state = self.update(
                 counter,
@@ -249,10 +183,12 @@ class IMNN:
         return - lndetF + r * Λ2
 
     def summariser(self, key, w, θ):
-        return self.model(w, self.simulator(key, θ))
+        print("Not implemented")
+        sys.exit()
 
     def summariser_gradient(self, key, w, θ):
-        return jax.jacrev(self.summariser, argnums=2)(key, w, θ)
+        print("Not implemented")
+        sys.exit()
 
     def get_summaries(self, rng, w, θ, n_sims):
         def get_summary(key):
