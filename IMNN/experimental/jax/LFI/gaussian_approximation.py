@@ -1,11 +1,10 @@
-import matplotlib.pyplot as plt
 import jax
 import jax.numpy as np
 from jax.scipy.stats import norm, multivariate_normal
-from IMNN.experimental.jax.lfi import  LFI
+from IMNN.experimental.jax.lfi import LikelihoodFreeInference
 
-class GaussianApproximation(LFI):
-    def __init__(self, target_summaries, invF, prior, gridsize=100, **kwargs):
+class GaussianApproximation(LikelihoodFreeInference):
+    def __init__(self, target_summaries, invF, prior, gridsize=100):
         super().__init__(
             prior=prior,
             gridsize=gridsize)
@@ -14,6 +13,8 @@ class GaussianApproximation(LFI):
         if len(target_summaries.shape) == 1:
             target_summaries = np.expand_dims(target_summaries, 0)
         self.target_summaries = target_summaries
+        self.n_targets = self.target_summaries.shape[0]
+        self.n_summaries = self.target_summaries.shape[-1]
         self.invF = invF
         self.marginals = self.get_marginals()
 

@@ -82,9 +82,9 @@ class IMNN:
 
     @partial(jax.jit, static_argnums=(0, 12, 13, 14, 15, 16))
     def _fit(self,
-        state, max_detF, best_w, detF, detC, detinvC, Λ2, r, counter,
-        patience_counter, rng,
-        λ, α, patience, min_iterations, max_iterations):
+            state, max_detF, best_w, detF, detC, detinvC, Λ2, r, counter,
+            patience_counter, rng,
+            λ, α, patience, min_iterations, max_iterations):
         def loop_cond(inputs):
             return np.logical_and(
                 np.less(inputs[-2], patience),
