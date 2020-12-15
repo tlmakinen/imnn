@@ -1,9 +1,14 @@
+__author__="Tom Charnock"
+__version__="0.3dev"
+
 import matplotlib.pyplot as plt
 import sys
 import jax.numpy as np
 
 class LikelihoodFreeInference:
-    def __init__(self, prior, gridsize=100):
+    def __init__(self, prior, gridsize=100, verbose=True):
+        self.verbose = verbose
+
         self.prior = prior
         self.n_params = len(self.prior.event_shape)
         self.gridsize = self.get_gridsize(gridsize, self.n_params)
@@ -23,12 +28,14 @@ class LikelihoodFreeInference:
             if len(gridsize) == size:
                 gridsize = gridsize
             else:
-                print("`gridsize` is a list of length {} but `shape` " +
+                if self.verbose:
+                    print("`gridsize` is a list of length {} but `shape` " +
                       "determined by `input` is {}".format(
                         len(gridsize), size))
                 sys.exit()
         else:
-            print("`gridsize` is not a list or an integer")
+            if self.verbose:
+                print("`gridsize` is not a list or an integer")
             sys.exit()
         return gridsize
 
@@ -132,10 +139,12 @@ class LikelihoodFreeInference:
                      colours=None, hist=True, s=5, alpha=1., figsize=(10, 10),
                      linestyle="solid", target=None, format=False):
         if ranges is None:
-            print("`ranges` must be provided")
+            if self.verbose:
+                print("`ranges` must be provided")
             sys.exit()
         if points is None:
-            print("`points` to scatter must be provided")
+            if self.verbose:
+                print("`points` to scatter must be provided")
             sys.exit()
         return self.scatter_plot_(ax=ax, ranges=ranges, points=points,
                              labels=labels, colours=colours, hist=hist, s=s,
@@ -146,7 +155,8 @@ class LikelihoodFreeInference:
                       levels=None, linestyle="solid", colours=None,
                       target=None, format=False):
         if (marginals is None) and (self.marginals is None):
-            print("Need to provide `marginal` or run `get_marginals()`")
+            if self.verbose:
+                print("Need to provide `marginal` or run `get_marginals()`")
         elif marginals is None:
             marginals = self.marginals
         if levels is None:
@@ -158,7 +168,8 @@ class LikelihoodFreeInference:
         n_targets = self.target_choice(target)
         rows = len(ranges)
         columns = len(ranges)
-        ax = self.setup_plot(ax=ax, ranges=ranges, labels=labels, format=format)
+        ax = self.setup_plot(ax=ax, ranges=ranges, labels=labels,
+                             format=format)
         for column in range(columns):
             for row in range(rows):
                 for target in n_targets:

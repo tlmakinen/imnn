@@ -2,13 +2,14 @@ __author__="Tom Charnock"
 __version__="0.3dev"
 
 import jax
+import jax.numpy as np
 import sys
 import inspect
 from IMNN.experimental.jax.imnn import IMNN
 
 class SimulatorIMNN(IMNN):
     def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, model,
-                 optimiser, key, simulator):
+                 optimiser, key, simulator, verbose=True):
         super().__init__(
             n_s=n_s,
             n_d=n_d,
@@ -17,17 +18,21 @@ class SimulatorIMNN(IMNN):
             θ_fid=θ_fid,
             model=model,
             key=key,
-            optimiser=optimiser)
+            optimiser=optimiser,
+            verbose=verbose)
         if simulator is None:
-            print("no `simulator`")
+            if self.verbose:
+                print("no `simulator`")
             sys.exit()
         elif not callable(simulator):
-            print("`simulator` not callable")
+            if self.verbose:
+                print("`simulator` not callable")
             sys.exit()
         else:
             if len(inspect.signature(simulator).parameters) != 2:
-                print("`simulator` must take two arguments, a JAX prng and " +
-                      "simulator parameters")
+                if self.verbose:
+                    print("`simulator` must take two arguments, a JAX prng " +
+                      "and simulator parameters")
                 sys.exit()
             self.simulator = simulator
 
@@ -39,3 +44,15 @@ class SimulatorIMNN(IMNN):
 
     def summariser_gradient(self, key, w, θ):
         return jax.jacrev(self.summariser, argnums=2)(key, w, θ)
+
+    def get_summaries(self, rng, w, θ, n_sims, validate=False):
+        def get_summary(key):
+            return self.summariser(key, w, θ)
+        keys = np.array(jax.random.split(rng, num=n_sims))
+        return jax.vmap(get_summary)(keys)
+
+    def get_derivatives(self, rng, w, θ, n_sims, validate=False):
+        def get_gradient(key):
+            return self.summariser_gradient(key, w, θ)
+        keys = np.array(jax.random.split(rng, num=n_sims))
+        return jax.vmap(get_gradient)(keys)

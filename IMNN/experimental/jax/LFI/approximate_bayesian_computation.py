@@ -1,3 +1,6 @@
+__author__="Tom Charnock"
+__version__="0.3dev"
+
 ### TODO
 # Add kde as an alternative to the histogram
 
@@ -11,10 +14,11 @@ from scipy.ndimage import gaussian_filter
 
 class ApproximateBayesianComputation(LikelihoodFreeInference):
     def __init__(self, target_data, prior, simulator, compressor,
-                 gridsize=100, F=None, distance_measure=None):
+                 gridsize=100, F=None, distance_measure=None, verbose=True):
         super().__init__(
             prior=prior,
-            gridsize=gridsize)
+            gridsize=gridsize,
+            verbose=verbose)
         self.simulator = simulator
         self.compressor = compressor
         if len(target_data.shape) == 1:
@@ -42,13 +46,16 @@ class ApproximateBayesianComputation(LikelihoodFreeInference):
         if ((self.parameters.all is None) and
                 ((rng is None) or (n_samples is None)) and
                 ((parameters is None) or (summaries is None))):
-            print("No samples currently available. If running simulations " +
-                  "`rng` must be a JAX prng and `n_samples` an integer " +
-                  "number of samples. If using premade summaries " +
-                  "`parameters` and `summaries` must be numpy arrays.")
+            if self.verbose:
+                print("No samples currently available. If running " +
+                      "simulations `rng` must be a JAX prng and `n_samples` " +
+                      "an integer number of samples. If using premade " +
+                      "summaries `parameters` and `summaries` must be numpy " +
+                      "arrays.")
             sys.exit()
         if ((min_accepted is not None) and (ϵ is None)):
-            print("`ϵ` must be passed if passing `min_accepted`")
+            if self.verbose:
+                print("`ϵ` must be passed if passing `min_accepted`")
             sys.exit()
         if (rng is not None) and (n_samples is not None):
             if ((ϵ is not None) and (min_accepted is not None)):
@@ -201,9 +208,10 @@ class ApproximateBayesianComputation(LikelihoodFreeInference):
         parameters = parameters[keep]
         summaries = summaries[keep]
         distances = distances[:, keep]
-        print("{} accepted in last {} iterations ".format(
-            n_accepted - current_accepted, iteration),
-            "({} simulations done). ".format(n_simulations * iteration))
+        if self.verbose:
+            print("{} accepted in last {} iterations ".format(
+                  n_accepted - current_accepted, iteration),
+                  "({} simulations done). ".format(n_simulations * iteration))
         return parameters, summaries, distances
 
     def get_marginals(self, accepted_parameters=None, ranges=None,

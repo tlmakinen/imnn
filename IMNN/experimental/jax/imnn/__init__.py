@@ -3,8 +3,10 @@ __version__="0.3dev"
 
 from IMNN.experimental.jax.imnn.imnn import IMNN
 from IMNN.experimental.jax.imnn.simulator_imnn import SimulatorIMNN
+from IMNN.experimental.jax.imnn.gradient_imnn import GradientIMNN
 
 __all__ = [
     "IMNN",
-    "SimulatorIMNN"
+    "SimulatorIMNN",
+    "GradientIMNN"
 ]

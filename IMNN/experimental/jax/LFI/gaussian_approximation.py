@@ -1,3 +1,6 @@
+__author__="Tom Charnock"
+__version__="0.3dev"
+
 import jax
 import jax.numpy as np
 from jax.scipy.stats import norm, multivariate_normal
