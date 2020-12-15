@@ -206,8 +206,8 @@ class IMNN:
 
     def get_F_statistics(self, rng, w, θ, n_s, n_d, mean=False,
                          validate=False):
-        summaries = self.get_summaries(rng, w, θ, n_s, validate=validate)
-        derivatives = self.get_derivatives(rng, w, θ, n_d, validate=validate)
+        summaries, derivatives = self.get_summaries(
+            rng, w, θ, n_s, n_d, validate=validate)
         results = ()
         if mean:
             results = (np.mean(summaries, 0),)
@@ -233,14 +233,9 @@ class IMNN:
         r = self.get_regularisation_strength(Λ2, λ, α)
         return - lndetF + r * Λ2, (F, C, invC, Λ2, r)
 
-    def get_summaries(self, rng, w, θ, n_sims, validate=False):
+    def get_summaries(self, rng, w, θ, n_sims, n_ders, validate=False):
         if self.verbose:
             print("`get_summaries` not implemented")
-        sys.exit()
-
-    def get_derivatives(self, rng, w, θ, n_sims, validate=False):
-        if self.verbose:
-            print("`get_derivatives` not implemented")
         sys.exit()
 
     @partial(jax.jit, static_argnums=0)

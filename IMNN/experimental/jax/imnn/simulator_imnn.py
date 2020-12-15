@@ -5,7 +5,9 @@ import jax
 import jax.numpy as np
 import sys
 import inspect
+from functools import partial
 from IMNN.experimental.jax.imnn import IMNN
+from IMNN.experimental.jax.utils import value_and_jacrev
 
 class SimulatorIMNN(IMNN):
     def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, model,
@@ -39,20 +41,15 @@ class SimulatorIMNN(IMNN):
     def get_fitting_keys(self, rng):
         return jax.random.split(rng, num=3)
 
-    def summariser(self, key, w, θ):
-        return self.model(w, self.simulator(key, θ))
-
-    def summariser_gradient(self, key, w, θ):
-        return jax.jacrev(self.summariser, argnums=2)(key, w, θ)
-
-    def get_summaries(self, rng, w, θ, n_sims, validate=False):
-        def get_summary(key):
-            return self.summariser(key, w, θ)
+    def get_summaries(self, rng, w, θ, n_sims, n_ders, validate=False):
+        def get_summary(rng, θ):
+            return self.model(w, self.simulator(rng, θ))
+        def get_derivatives(rng):
+            return value_and_jacrev(get_summary, argnums=1)(rng, θ)
         keys = np.array(jax.random.split(rng, num=n_sims))
-        return jax.vmap(get_summary)(keys)
-
-    def get_derivatives(self, rng, w, θ, n_sims, validate=False):
-        def get_gradient(key):
-            return self.summariser_gradient(key, w, θ)
-        keys = np.array(jax.random.split(rng, num=n_sims))
-        return jax.vmap(get_gradient)(keys)
+        summaries, derivatives = jax.vmap(get_derivatives)(keys[:n_ders])
+        if n_sims > n_ders:
+            summaries = np.vstack([
+                summaries,
+                jax.vmap(partial(get_summary, θ=θ))(keys[n_ders:])])
+        return summaries, derivatives
