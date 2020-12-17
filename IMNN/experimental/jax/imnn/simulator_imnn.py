@@ -42,10 +42,10 @@ class SimulatorIMNN(IMNN):
         return jax.random.split(rng, num=3)
 
     def get_summaries(self, rng, w, θ, n_sims, n_ders, validate=False):
-        def get_summary(rng, θ):
-            return self.model(w, self.simulator(rng, θ))
-        def get_derivatives(rng):
-            return value_and_jacrev(get_summary, argnums=1)(rng, θ)
+        def get_summary(key, θ):
+            return self.model(w, self.simulator(key, θ))
+        def get_derivatives(key):
+            return value_and_jacrev(get_summary, argnums=1)(key, θ)
         keys = np.array(jax.random.split(rng, num=n_sims))
         summaries, derivatives = jax.vmap(get_derivatives)(keys[:n_ders])
         if n_sims > n_ders:

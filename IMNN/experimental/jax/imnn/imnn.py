@@ -1,6 +1,7 @@
 __author__="Tom Charnock"
 __version__="0.3dev"
 
+import math
 import jax
 import jax.numpy as np
 import sys
@@ -58,7 +59,7 @@ class IMNN:
                 self.history["val_"+key] = np.hstack(
                     [self.history["val_"+key], result[:, 1]])
 
-    def fit(self, λ, α, rng=None, patience=100,
+    def fit(self, λ, ϵ, rng=None, patience=100,
             min_iterations=1000, max_iterations=int(1e5)):
         if self.validate:
             shape = (max_iterations, 2)
@@ -86,8 +87,13 @@ class IMNN:
          r,
          counter,
          patience_counter,
-         rng) = self._fit(*inputs, λ, α, patience, min_iterations,
-                          max_iterations)
+         rng) = self._fit(
+            *inputs,
+            λ,
+            - math.log(ϵ * (λ - 1.) + ϵ**2. / (1 + ϵ)) / ϵ,
+            patience,
+            min_iterations,
+            max_iterations)
         self.set_history(
             (detF[:counter],
             detC[:counter],
