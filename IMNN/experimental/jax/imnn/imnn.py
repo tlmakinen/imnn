@@ -4,23 +4,27 @@ __version__="0.3dev"
 import math
 import jax
 import jax.numpy as np
-import sys
 import matplotlib.pyplot as plt
 from functools import partial
+from IMNN.experimental.jax.utils import check_type, check_model, \
+    check_optimiser
 
 class IMNN:
-    def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, model,
-                 optimiser, key, verbose=True):
-        self.verbose = verbose
+    def __init__(self, n_s, n_d, n_params, n_summaries, input_shape, θ_fid,
+                 model, optimiser, key, verbose=True):
+        self.verbose = check_type(verbose, bool, "verbose")
 
-        self.n_s = n_s
-        self.n_d = n_d
-        self.n_summaries = n_summaries
-        self.input_shape = input_shape
-        self.θ_fid = θ_fid
-        self.n_params = self.θ_fid.shape[-1]
-        self.model_initialiser, self.model = model
-        self.opt_initialiser, self.update, self.get_parameters = optimiser
+        self.n_s = check_type(n_s, int, "n_s")
+        self.n_d = check_type(n_d, int, "n_d")
+        self.n_params = check_type(n_params, int, "n_params")
+        self.n_summaries = check_type(n_summaries, int, "n_summaries")
+        self.input_shape = check_type(input_shape, tuple, "input_shape")
+        self.θ_fid = check_type(
+            θ_fid, type(np.array([])), "θ_fid",
+            np.empty(self.n_params).shape)
+        self.model_initialiser, self.model = check_model(model)
+        self.opt_initialiser, self.update, self.get_parameters = \
+            check_optimiser(optimiser)
 
         _, initial_w = self.model_initialiser(key, self.input_shape)
         self.state = self.opt_initialiser(initial_w)
@@ -29,6 +33,7 @@ class IMNN:
         self.best_w = self.get_parameters(self.state)
 
         self.validate = False
+        self.simulate = False
 
         self.F = None
         self.invF = None
@@ -61,6 +66,13 @@ class IMNN:
 
     def fit(self, λ, ϵ, rng=None, patience=100,
             min_iterations=1000, max_iterations=int(1e5)):
+        λ = check_type(λ, float, "λ")
+        α = self.get_α(check_type(ϵ, float, "ϵ"), λ)
+        patience = check_type(patience, int, "patience")
+        min_iterations = check_type(min_iterations, int, "min_iterations")
+        max_iterations = check_type(max_iterations, int, "max_iterations")
+        if (not self.simulate) and (rng is not None):
+            raise ValueError("rng should not be passed if not simulating.")
         if self.validate:
             shape = (max_iterations, 2)
         else:
@@ -90,7 +102,7 @@ class IMNN:
          rng) = self._fit(
             *inputs,
             λ,
-            - math.log(ϵ * (λ - 1.) + ϵ**2. / (1 + ϵ)) / ϵ,
+            α,
             patience,
             min_iterations,
             max_iterations)
@@ -103,6 +115,9 @@ class IMNN:
         self.final_w = self.get_parameters(self.state)
         self.set_F_statistics(
             rng, self.final_w, self.θ_fid, self.n_s, self.n_d)
+
+    def get_α(self, λ, ϵ):
+        return - math.log(ϵ * (λ - 1.) + ϵ**2. / (1 + ϵ)) / ϵ
 
     def get_fitting_keys(self, rng):
         return None, None, None
@@ -200,7 +215,7 @@ class IMNN:
         return jax.lax.while_loop(loop_cond, loop_body, results)
 
     def set_F_statistics(self, rng, w, θ, n_s, n_d, validate=True):
-        if validate and (not self.validate):
+        if validate and ((not self.validate) and (not self.simulate)):
             if self.verbose:
                 print("no available validation data. setting statistics " +
                     "with training set")
@@ -261,29 +276,66 @@ class IMNN:
                 self.invC,
                 self.model(self.final_w, d) - self.μ)
 
-    def training_plot(self, expected_detF=None, figsize=(5, 15)):
-        fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize)
-        ax[0].plot(self.history["detF"], color="C0")
+    def setup_plot(self, ax=None, expected_detF=None, figsize=(5, 15)):
+        if ax is None:
+            fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize)
+            plt.subplots_adjust(hspace=0.05)
+        ax = [x for x in ax] + [ax[2].twinx()]
         if expected_detF is not None:
             ax[0].axhline(expected_detF, linestyle="dashed", color="black")
-        ax[0].set_xlim(0, self.history["detF"].shape[0]-1)
-        ax[0].set_ylabel(r"$\ln|{\bf F}|$")
-        ax[1].plot(self.history["detC"], color="C0")
-        ax[1].plot(self.history["detinvC"], linestyle="dotted", color="C0")
-        ax[1].axhline(0, linestyle="dashed", color="black")
+        ax[0].set_ylabel(r"$|{\bf F}|$")
+        ax[1].axhline(1, linestyle="dashed", color="black")
         ax[1].set_ylabel(r"$|{\bf C}|$ and $|{\bf C}^{-1}|$")
         ax[1].set_yscale("log")
-        ax_ = ax[2].twinx()
-        ax[2].plot(self.history["Λ2"], color="C0")
         ax[2].set_xlabel("Number of iterations")
         ax[2].set_ylabel(r"$\Lambda_2$")
-        ax_.plot(self.history["r"], color="C0", linestyle="dashed")
-        ax_.set_ylabel(r"$r$")
+        ax[3].set_ylabel(r"$r$")
+        return ax
+
+    def training_plot(self, ax=None, expected_detF=None, colour="C0",
+                      figsize=(5, 15), label="", filename=None, ncol=1):
+        if ax is None:
+            ax = self.setup_plot(expected_detF=expected_detF, figsize=figsize)
+        ax[0].set_xlim(
+            0, max(self.history["detF"].shape[0]-1, ax[0].get_xlim()[-1]))
+        ax[0].plot(self.history["detF"], color=colour,
+                   label=r"{} $|F|$ (training)".format(label))
+        ax[1].set_xlim(
+            0, max(self.history["detF"].shape[0]-1, ax[0].get_xlim()[-1]))
+        ax[1].plot(self.history["detC"], color=colour,
+                   label=r"{} $|C|$ (training)".format(label))
+        ax[1].plot(self.history["detinvC"], linestyle="dotted", color=colour,
+                   label=label+r" $|C^{-1}|$ (training)")
+        ax[3].set_xlim(
+            0, max(self.history["detF"].shape[0]-1, ax[0].get_xlim()[-1]))
+        ax[2].plot(self.history["Λ2"], color=colour,
+                   label=r"{} $\Lambda_2$ (training)".format(label))
+        ax[3].plot(self.history["r"], color=colour, linestyle="dashed",
+                   label=r"{} $r$ (training)".format(label))
         if self.validate:
-            ax[0].plot(self.history["val_detF"], color="C1")
-            ax[1].plot(self.history["val_detC"], color="C1")
-            ax[1].plot(self.history["val_detinvC"], linestyle="dotted",
-                       color="C1")
-            ax[2].plot(self.history["val_Λ2"], color="C1")
-            ax_.plot(self.history["val_r"], color="C1", linestyle="dashed")
+            ax[0].plot(self.history["val_detF"], color=colour,
+                       label=r"{} $|F|$ (validation)".format(label),
+                       linestyle="dotted")
+            ax[1].plot(self.history["val_detC"], color=colour,
+                       label=r"{} $|C|$ (validation)".format(label),
+                       linestyle="dotted")
+            ax[1].plot(self.history["val_detinvC"],
+                       color=colour,
+                       label=label+r" $|C^{-1}|$ (validation)",
+                       linestyle="dashdot")
+            ax[2].plot(self.history["val_Λ2"], color=colour,
+                       label=r"{} $\Lambda_2$ (validation)".format(label),
+                       linestyle="dotted")
+            ax[3].plot(self.history["val_r"], color=colour,
+                     label=r"{} $l$ (validation)".format(label),
+                     linestyle="dashdot")
+        h1, l1 = ax[2].get_legend_handles_labels()
+        h2, l2 = ax[3].get_legend_handles_labels()
+        ax[0].legend(bbox_to_anchor=(1.0, 1.0), frameon=False, ncol=ncol)
+        ax[1].legend(frameon=False, bbox_to_anchor=(1.0, 1.0), ncol=ncol*2)
+        ax[3].legend(h1+h2, l1+l2, bbox_to_anchor=(1.05, 1.0),
+                             frameon=False, ncol=ncol*2)
+
+        if filename is not None:
+            plt.savefig(filename, bbox_inches="tight", transparent=True)
         return ax

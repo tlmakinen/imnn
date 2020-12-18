@@ -56,8 +56,8 @@ class LikelihoodFreeInference:
                 value.append(this_value)
         return value
 
-    def setup_plot(self, ax=None, ranges=None, labels=None, figsize=(10, 10),
-                   format=False):
+    def setup_plot(self, ax=None, ranges=None, axis_labels=None,
+                   figsize=(10, 10), format=False):
         rows = len(ranges)
         columns = len(ranges)
         if ax is None:
@@ -74,8 +74,8 @@ class LikelihoodFreeInference:
                         ax[row, column].set_ylim(
                             ranges[row][0],
                             ranges[row][-1])
-                        if (column == 0) and (labels is not None):
-                            ax[row, column].set_ylabel(labels[row])
+                        if (column == 0) and (axis_labels is not None):
+                            ax[row, column].set_ylabel(axis_labels[row])
                     else:
                         ax[row, column].set_yticks([])
                     if row < rows - 1:
@@ -86,34 +86,38 @@ class LikelihoodFreeInference:
                         ax[row, column].set_xlim(
                             ranges[column][0],
                             ranges[column][-1])
-                        if (row == rows - 1) and (labels is not None):
-                            ax[row, column].set_xlabel(labels[column])
+                        if (row == rows - 1) and (axis_labels is not None):
+                            ax[row, column].set_xlabel(axis_labels[column])
                     else:
                         ax[row, column].set_xticks([])
         return ax
 
-    def scatter_plot_(self, ax=None, ranges=None, points=None, labels=None,
-                      colours=None, hist=True, s=5, alpha=1.,
+    def scatter_plot_(self, ax=None, ranges=None, points=None, label=None,
+                      axis_labels=None, colours=None, hist=True, s=5, alpha=1.,
                       figsize=(10, 10), linestyle="solid", target=None,
-                      format=False):
+                      format=False, ncol=2, bbox_to_anchor=(0.0, 1.0)):
+        targets, n_targets = self.target_choice(target)
         if colours is None:
-            colours = ["C{}".format(i) for i in range(self.n_targets)]
+            colours = ["C{}".format(i) for i in range(n_targets)]
+        if type(colours) is str:
+            colours = [colours for i in range(n_targets)]
         if ranges is None:
             ranges = self.ranges
-        n_targets = self.target_choice(target)
+        if label is None:
+            label = ""
         rows = len(ranges)
         columns = len(ranges)
-        ax = self.setup_plot(ax=ax, ranges=ranges, labels=labels,
+        ax = self.setup_plot(ax=ax, ranges=ranges, axis_labels=axis_labels,
                              figsize=figsize, format=format)
         for column in range(columns):
             for row in range(rows):
-                for target in n_targets:
+                for i, target in enumerate(targets):
                     if (column == row) and hist:
                         if column < columns - 1:
                             ax[row, column].hist(
                                 points[target][:, row],
                                 bins=ranges[row],
-                                color=colours[target],
+                                color=colours[i],
                                 linestyle=linestyle,
                                 density=True,
                                 histtype="step")
@@ -121,23 +125,32 @@ class LikelihoodFreeInference:
                             ax[row, column].hist(
                                 points[target][:, row],
                                 bins=ranges[column],
-                                color=colours[target],
+                                color=colours[i],
                                 linestyle=linestyle,
                                 density=True,
                                 histtype="step",
                                 orientation="horizontal")
+
                     elif column < row:
                         ax[row, column].scatter(
                             points[target][:, column],
                             points[target][:, row],
                             s=s,
-                            color=colours[target],
-                            alpha=alpha)
+                            color=colours[i],
+                            alpha=alpha,
+                            label=label+" Target {}".format(target+1))
+                        h, l = ax[row, column].get_legend_handles_labels()
+        if label != "":
+            ax[0, 0].legend(h, l,
+                frameon=False,
+                bbox_to_anchor=bbox_to_anchor,
+                ncol=ncol)
         return ax
 
-    def scatter_plot(self, ax=None, ranges=None, points=None, labels=None,
-                     colours=None, hist=True, s=5, alpha=1., figsize=(10, 10),
-                     linestyle="solid", target=None, format=False):
+    def scatter_plot(self, ax=None, ranges=None, points=None, label=None,
+                     axis_labels=None, colours=None, hist=True, s=5, alpha=1.,
+                     figsize=(10, 10), linestyle="solid", target=None,
+                     format=False, ncol=2, bbox_to_anchor=(0.0, 1.0)):
         if ranges is None:
             if self.verbose:
                 print("`ranges` must be provided")
@@ -147,13 +160,17 @@ class LikelihoodFreeInference:
                 print("`points` to scatter must be provided")
             sys.exit()
         return self.scatter_plot_(ax=ax, ranges=ranges, points=points,
-                             labels=labels, colours=colours, hist=hist, s=s,
-                             alpha=alpha, figsize=figsize, linestyle=linestyle,
-                             target=target, format=format)
+                             label=label, axis_labels=axis_labels,
+                             colours=colours, hist=hist, s=s, alpha=alpha,
+                             figsize=figsize, linestyle=linestyle,
+                             target=target, format=format, ncol=ncol,
+                             bbox_to_anchor=bbox_to_anchor)
 
-    def marginal_plot(self, ax=None, ranges=None, marginals=None, labels=None,
-                      levels=None, linestyle="solid", colours=None,
-                      target=None, format=False):
+    def marginal_plot(self, ax=None, ranges=None, marginals=None, label=None,
+                      axis_labels=None, levels=None, linestyle="solid",
+                      colours=None, target=None, format=False, ncol=2,
+                      bbox_to_anchor=(1.0, 1.0)):
+        targets, n_targets = self.target_choice(target)
         if (marginals is None) and (self.marginals is None):
             if self.verbose:
                 print("Need to provide `marginal` or run `get_marginals()`")
@@ -162,48 +179,60 @@ class LikelihoodFreeInference:
         if levels is None:
             levels = [0.68, 0.95]
         if colours is None:
-            colours = ["C{}".format(i) for i in range(self.n_targets)]
+            colours = ["C{}".format(i) for i in range(n_targets)]
+        if type(colours) is str:
+            colours = [colours for i in range(n_targets)]
         if ranges is None:
             ranges = self.ranges
-        n_targets = self.target_choice(target)
+        if label is None:
+            label = ""
         rows = len(ranges)
         columns = len(ranges)
-        ax = self.setup_plot(ax=ax, ranges=ranges, labels=labels,
+        ax = self.setup_plot(ax=ax, ranges=ranges, axis_labels=axis_labels,
                              format=format)
         for column in range(columns):
             for row in range(rows):
-                for target in n_targets:
+                for i, target in enumerate(targets):
                     if column == row:
                         if column < columns - 1:
                             ax[row, column].plot(
                                 ranges[row],
                                 marginals[row][column][target],
-                                color=colours[target],
-                                linestyle=linestyle)
+                                color=colours[i],
+                                linestyle=linestyle,
+                                label=label)
                         else:
                             ax[row, column].plot(
                                 marginals[row][column][target],
                                 ranges[row],
-                                color=colours[target],
+                                color=colours[i],
                                 linestyle=linestyle)
                     elif column < row:
                         ax[row, column].contour(
                             ranges[column],
                             ranges[row],
                             marginals[row][column][target].T,
-                            colors=colours[target],
-                            linestyles=linestyle,
+                            colors=colours[i],
+                            linestyles=[linestyle],
                             levels=self.get_levels(
                                 marginals[row][column][target],
                                 [ranges[column], ranges[row]],
                                 levels=levels))
+        if label != "":
+            ax[0, 0].legend(
+                frameon=False,
+                bbox_to_anchor=bbox_to_anchor,
+                ncol=ncol)
         return ax
 
     def target_choice(self, target):
         if target is None:
-            n_targets = range(self.n_targets)
+            targets = range(self.n_targets)
+            n_targets = self.n_targets
         elif type(target) == list:
-            n_targets = target
+            targets = target
+            n_targets = len(target)
         else:
-            n_targets = [target]
-        return n_targets
+            targets = [target]
+            n_targets = 1
+        return targets, n_targets

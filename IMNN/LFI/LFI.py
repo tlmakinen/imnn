@@ -580,7 +580,7 @@ class PopulationMonteCarlo(ApproximateBayesianComputation):
         """Population Monte Carlo
 
         This is the population Monte Carlo sequential ABC method, highly
-        optimised for minimal numbers of drawsself.
+        optimised for minimal numbers of draws.
 
         It works by first running an ABC and sorting the output distances,
         keeping the closest n parameters (where n is the number of samples to

@@ -6,7 +6,9 @@ model parameters.
 TODO
 ____
 Still some docstrings which need finishing
-Use precomputed external covariance and derivatives"""
+Use precomputed external covariance and derivatives
+
+"""
 
 
 __version__ = '0.2dev'
@@ -25,86 +27,99 @@ class IMNN:
     The information maximising neural network class contains all the functions
     necessary to train a neural network to maximise the Fisher information of
     the summaries of the input data.
+
     Attributes
     __________
-    u : class
-        model of functions for parameter error checking
-    dtype : TF type
-        32 bit or 64 TensorFlow tensor floats
-    itype : TF type
-        32 bit or 64 TensorFlow tensor integers
-    save : bool
-        whether to save the model
-    directory : str
-        directory for loading and saving the model
-    filename : str
-        filename for loading and saving the model
-    validate : bool
-        whether to validate during training
-    n_s : int
-        number of simulations to calculate summary covariance
-    n_d : int
-        number of derivatives simulations to calculate derivative of mean
-    n_params : int
-        number of parameters in physical model
-    n_summaries : int
-        number of summaries to compress data to
-    model : TF model - keras or other
-        neural network to do the compression defined using TF or keras
-    variables : tuple of TF tensor float
-        the trainable variables of the model
-    optimiser : TF optimiser - keras or other
-        optimisation operation to do weight updates, defined using TF or keras
-    θ_fid : TF tensor float (n_params,)
-        fiducial parameter values for training dataset
-    δθ : TF tensor float (n_params,)
-        parameter differences for numerical derivatives
-    input_shape : tuple
-        shape of the input data
-    data : TF tensor float (n_s,) + input_shape
-        fiducial data for training IMNN
-    derivative : TF tensor float (n_d, 2, n_params) + input_shape
-        derivatives of the data for training IMNN (second index 0=-ve, 1=+ve)
-    validation_data : TF tensor float (n_s,) + input_shape
-        fiducial data for validating IMNN
-    validation_derivative : TF tensor float (n_d, 2, n_params) + input_shape
-        derivatives of the data for validating IMNN (second index 0=-ve, 1=+ve)
-    fiducial_at_once : int
-        number of simulations to process at once if using TF.data.Dataset
-    derivative_at_once : int
-        number of simulations to process at once if using TF.data.Dataset
-    fiducial_dataset : TF dataset
-        dataset to grab large fiducial data for training IMNN
-    derivative_dataset : TF dataset
-        dataset to grab large derivative data for training IMNN
-    validation_fiducial_dataset : TF dataset
-        dataset to grab large fiducial data for validating IMNN
-    validation_derivative_dataset : TF dataset
-        dataset to grab large derivative data for validating IMNN
-    F : TF tensor float (n_params, n_params)
-        Fisher information matrix
-    Finv : TF tensor float (n_params, n_params)
-        inverse Fisher information matrix
-    C : TF tensor float (n_summaries, n_summaries)
-        covariance of summaries
-    Cinv : TF tensor float (n_summaries, n_summaries)
-        inverse covariance of summaries
-    μ : TF tensor float (n_summaries)
-        mean of the summaries
-    dμ_dθ : TF tensor float (n_params, n_summaries)
-        derivative of mean summaries with respect to the parameters
-    reg : TF tensor float ()
-        value of regulariser
-    r : TF tensor float ()
-        value of the dynamical coupling strength of the regulariser
-    λ : TF tensor float ()
-        coupling strength for the regularisation
-    α : TF tensor float ()
-        decay rate for the regularisation
-    prebuilt : bool
-        whether to build the datasets and pipeline on initialisation
-    history : dict
-        history object for saving training statistics.
+
+    :param u: module of functions for parameter error checking
+    :type u: class:`IMNN.utils.utils.utils`
+    :param dtype: 32 bit or 64 TensorFlow tensor floats
+    :type dtype: tf.dtype
+    :param itype: 32 bit or 64 TensorFlow tensor integers
+    :type itype: tf.dtype
+    :param save: whether to save the model
+    :type save: bool
+    :param directory: directory for loading and saving the model
+    :type directory: str
+    :param filename: filename for loading and saving the model
+    :type filename: str
+    :param validate: whether to validate during training
+    :type validate: bool
+    :param n_s: number of simulations to calculate summary covariance
+    :type n_s: int
+    :param n_d: number of simulations to calculate derivative of mean
+    :type n_d: int
+    :param n_params: number of parameters in physical model
+    :type n_params: int
+    :param n_summaries: number of summaries to compress data to
+    :type n_summaries: int
+    :param model: neural network to do the compression defined using TF/keras
+    :type model: tf.keras.Models - keras/other
+    :param variables: the trainable variables of the model
+    :type variables: tuple of tf.TensorArray([])
+    :param optimiser: optimiser to do weight updates, defined using TF/keras
+    :type optimiser: tf.keras.Optimizers - keras/other
+    :param θ_fid: fiducial parameter values for training dataset
+    :type θ_fid: tf.TensorArray([]) (n_params,)
+    :param δθ: parameter differences for numerical derivatives
+    :type δθ: tf.TensorArray([]) (n_params,)
+    :param input_shape: shape of a single simulation
+    :type input_shape: tuple
+    :param data: fiducial data for training IMNN
+    :type data: tf.TensorArray([]) (n_s,) + input_shape
+    :param derivative: derivatives of the data for training IMNN
+        (second index 0=-ve, 1=+ve)
+    :type derivative: tf.TensorArray([]) (n_d, 2, n_params) + input_shape
+    :param validation_data: fiducial data for validating IMNN
+    :type validation_data: tf.TensorArray([]) (n_s,) + input_shape
+    :param validation_derivative: derivatives of the data for validating IMNN
+        (second index 0=-ve, 1=+ve)
+    :type validation_derivative: tf.TensorArray([])
+        (n_d, 2, n_params) + input_shape
+    :param fiducial_at_once: number of simulations to process at once if
+        using TF.data.Dataset
+    :type fiducial_at_once: int
+    :param derivative_at_once: number of simulations to process at once if
+        using TF.data.Dataset
+    :type derivative_at_once: int
+    :param fiducial_dataset: dataset to grab large fiducial data for
+        training IMNN
+    :type fiducial_dataset: tf.data.Dataset()
+    :param derivative_dataset: dataset to grab large derivative data for
+        training IMNN
+    :type derivative_dataset: tf.data.Dataset()
+    :param validation_fiducial_dataset: dataset to grab large fiducial
+        data for validating IMNN
+    :type validation_fiducial_dataset: tf.data.Dataset()
+    :param validation_derivative_dataset: dataset to grab large derivative
+        data for validating IMNN
+    :type validation_derivative_dataset: tf.data.Dataset()
+    :param F: Fisher information matrix
+    :type F: tf.TensorArray([]) (n_params, n_params)
+    :param Finv: inverse Fisher information matrix
+    :type Finv: tf.TensorArray([]) (n_params, n_params)
+    :param C: covariance of summaries
+    :type C: tf.TensorArray([]) (n_summaries, n_summaries)
+    :param Cinv: inverse covariance of summaries
+    :type Cinv: tf.TensorArray([]) (n_summaries, n_summaries)
+    :param μ: mean of the summaries
+    :type μ: tf.TensorArray([]) (n_summaries,)
+    :param dμ_dθ: derivative of mean summaries with respect to the parameters
+    :type dμ_dθ: tf.TensorArray([]) (n_params, n_summaries)
+    :param reg: value of regulariser
+    :type reg: tf.TensorArray([]) ()
+    :param r: value of the dynamical coupling strength of the regulariser
+    :type r: tf.TensorArray([]) ()
+    :param λ: coupling strength for the regularisation
+    :type λ: tf.TensorArray([]) ()
+    :param α: decay rate for the regularisation
+    :type α: tf.TensorArray([]) ()
+    :param prebuilt: whether to build the datasets and pipeline on
+        initialisation
+    :type prebuilt: bool
+    :param history: history object for saving training statistics.
+    :type history: dict
+
     """
     def __init__(self, n_s, n_d, n_params, n_summaries,
                  θ_fid, δθ, input_shape, fiducial, derivative,
@@ -125,9 +140,9 @@ class IMNN:
             number of parameters in physical model
         n_summaries : int
             number of summaries to compress data to
-        model : TF model (keras or other)
+        model : tf.keras.Models (keras or other)
             neural network to do the compression defined using TF or keras
-        optimiser : TF optimiser (keras or other)
+        optimiser : tf.keras.Optimizers (keras or other)
             optimisation operation to do weight updates using TF or keras
         θ_fid : ndarray (n_params,)
             fiducial parameter values for training dataset
@@ -149,7 +164,7 @@ class IMNN:
                 or func or list
             numpy array containing derivative data or function returning same
         map_fn : func
-            function for data augmentation when using TF datasets
+            function for data augmentation when using tf.data.Dataset()s
         dtype : TF type
             tensorflow double size
         itype : TF type
@@ -185,6 +200,7 @@ class IMNN:
             builds the data pipeline for training and validation
         IMNN.utils.utils.build_warning(bool)
             warning and checking for whether IMNN pipeline is built on start
+
         """
         self.u = utils.utils(verbose=verbose)
         check_shape = self.u.type_checking(check_shape, True, "check_shape")
@@ -242,6 +258,7 @@ class IMNN:
             checks that value exists and is of the correct type
         IMNN.utils.utils.positive_integer(int, str) -> int
             checks whether parameter is positive integer and error otherwise
+
         """
         self.verbose = self.u.type_checking(verbose, True, "verbose")
 
@@ -325,6 +342,7 @@ class IMNN:
             val_dμ_dθ - derivative of mean validation summaries wrt parameters
             reg - value of the regularisation term
             r - value of the coupling strength of the regulariser
+
         """
         return {
             "det_F": [],
@@ -360,14 +378,14 @@ class IMNN:
         validation_derivative : nd_array (n_d, 2, n_params)+input_shape
                 or func or list
             numpy array containing derivative data or function returning same
-        model : TF model (keras or other)
+        model : tf.keras.Models (keras or other)
             neural network to do the compression defined using TF or keras
-        optimiser : TF optimiser (keras or other)
+        optimiser : tf.keras.Optimizers (keras or other)
             optimisation operation to do weight updates using TF or keras
         at_once : int
             number of simulations to process at once if using TF.data.Dataset
         map_fn : func
-            function for data augmentation when using TF datasets
+            function for data augmentation when using tf.data.Dataset()s
         check_shape : bool
             whether to check the shape of the model and the data
         load : bool
@@ -384,6 +402,7 @@ class IMNN:
             checks that value exists and is of the correct type
         set_model(model, optimiser)
             loads the model and optimiser as attributes
+
         """
         self.prebuilt = True
         self.set_data(input_shape, fiducial, derivative,
@@ -397,9 +416,9 @@ class IMNN:
 
         Parameters
         __________
-        model : TF model (keras or other)
+        model : tf.keras.Models (keras or other)
             neural network to do the compression defined using TF or keras
-        optimiser : TF optimiser (keras or other)
+        optimiser : tf.keras.Optimizers (keras or other)
             optimisation operation to do weight updates using TF or keras
         load : bool
             whether to load a previous model from file
@@ -412,6 +431,7 @@ class IMNN:
             loads a previously saved model
         check_model(model, tuple, int)
             checks that model takes expected input shape and output n_summaries
+
         """
         if load:
             self.load_model(optimiser, weights=weights)
@@ -433,7 +453,7 @@ class IMNN:
 
             Parameters
             __________
-            variables : tuple of TF tensor floats
+            variables : tuple of tf.TensorArray([])s
                 stored trainable variabels
             """
             self.variables = variables
@@ -443,10 +463,11 @@ class IMNN:
 
         Parameters
         __________
-        optimiser : TF optimiser (keras or other)
+        optimiser : tf.keras.Optimizers (keras or other)
             optimisation operation to do weight updates using TF or keras
         weights : str
             filename for saving weights
+
         """
         self.model = tf.keras.models.load_model("/".join((self.directory,
             self.filename)))
@@ -475,6 +496,7 @@ class IMNN:
         _____
         IMNN.utils.utils.check_shape(any, type, tuple, str, opt(str))
             checks that value is of the correct type and shape
+
         """
         self.F = tf.zeros((self.n_params, self.n_params),
                           dtype=self.dtype,
@@ -552,7 +574,7 @@ class IMNN:
         at_once : int
             number of simulations to process at once
         map_fn : func
-            function for data augmentation when using TF datasets
+            function for data augmentation when using tf.data.Dataset()s
         check_shape : bool
             whether to check the shape of the model and the data
 
@@ -564,6 +586,7 @@ class IMNN:
             prints warning if data is not correct
         build_dataset(func, bool, opt(func))
             builder for the tf.data.Dataset based on loading function
+
         """
         self.input_shape = self.u.check_input(input_shape)
         if ((type(fiducial) is np.ndarray) and
@@ -713,10 +736,9 @@ class IMNN:
         _______
         dataset : iter
             an iterator of the entire dataset
+
         """
 
-        #counter = tf.data.Dataset.from_generator(
-        #    self.step_counter, self.itype, tf.TensorShape([]))
         counter = tf.data.Dataset.range(tf.cast(1e10, self.itype))
 
         if not validation:
@@ -790,10 +812,11 @@ class IMNN:
 
         Returns
         _______
-        data : TF tensor float input_shape
+        data : tf.TensorArray([]) input_shape
             the parsed data for passing through the network
         seed : TF tensor int ()
             the index of the simulation being grabbed
+
         """
         features = {
             "seed": tf.io.FixedLenFeature([], tf.int64),
@@ -815,7 +838,7 @@ class IMNN:
 
         Returns
         _______
-        data : TF tensor float input_shape
+        data : tf.TensorArray([]) input_shape
             the parsed data for passing through the network
         index : TF tensor int ()
             the index of the simulation being grabbed
@@ -823,6 +846,7 @@ class IMNN:
             the index labelling the derivative
         parameter : TF tensor int ()
             the index labelling the parameter
+
         """
         features = {
             "seed": tf.io.FixedLenFeature([], tf.int64),
@@ -838,16 +862,6 @@ class IMNN:
         parameter = tf.cast(parsed_example["parameter"], self.itype)
         return data, (index, derivative, parameter)
 
-    #def step_counter(self):
-    #    """Generator to provide an iteration counter to datasets
-    #
-    #    Returns
-    #    _______
-    #    i : int
-    #        an itertools infinite generator counter
-    #    """
-    #    for i in itertools.count(): yield i
-
     def build_tfrecord(self, loader, derivative, validation, map_fn=None):
         """Build tf.data.Dataset from the list of .tfrecord files
 
@@ -861,10 +875,9 @@ class IMNN:
             whether the dataset is for the validation set of the training set
         map_fn : func
             a function taking a datum and augmenting it as part of the pipeline
+
         """
 
-        #counter = tf.data.Dataset.from_generator(
-        #    self.step_counter, self.itype, tf.TensorShape([]))
         counter = tf.data.Dataset.range(tf.cast(1e10, self.itype))
 
         if not validation:
@@ -911,10 +924,11 @@ class IMNN:
 
         Returns
         _______
-        dataset : TF dataset
+        dataset : tf.data.Dataset()
             fiducial or derivative dataset (for training or validation)
         get_indices : func
             function for creating mesh of indices for fiducial or derivatives
+
         """
         if derivative:
             if validate:
@@ -945,6 +959,7 @@ class IMNN:
         _______
             indices : TF tensor int (batch, n_summaries)
                 mesh of indices for scattering fiducial summaries
+
         """
         return tf.stack(
             tf.meshgrid(
@@ -967,6 +982,7 @@ class IMNN:
         _______
         indices : TF tensor int (batch, n_summaries, 4)
             mesh of indices for scattering derivative summaries
+
         """
         return tf.vectorized_map(
             lambda i: tf.squeeze(
@@ -986,7 +1002,7 @@ class IMNN:
 
         Parameters
         __________
-        x : TF tensor float (n_s, n_summaries)/(n_d, 2, n_params, n_summaries)
+        x : tf.TensorArray([]) (n_s, n_summaries)/(n_d, 2, n_params, n_summaries)
             summaries outputted from the network
         derivative : bool
             whether the dataset is for derivatives or not
@@ -995,7 +1011,7 @@ class IMNN:
 
         Returns
         _______
-        x : TF tensor float (n_s, n_summaries)/(n_d, 2, n_params, n_summaries)
+        x : tf.TensorArray([]) (n_s, n_summaries)/(n_d, 2, n_params, n_summaries)
             summaries outputted from the network
 
         Calls
@@ -1006,6 +1022,7 @@ class IMNN:
             returns the mesh of indices for scattering fiducial summaries
         get_derivative_indices((tf.int, tf.int, tf.int))
             returns the mesh of indices for scattering derivative summaries
+
         """
         dataset, get_indices, loops = self.set_dataset(derivative, validate)
 
@@ -1019,15 +1036,6 @@ class IMNN:
                 x, indices, self.model(data[0]))
             return (x, loop_counter+1)
         return tf.while_loop(cond, body, (x, 0))[0]
-        ##for loop in range(loops):
-        #for data, seed in dataset:
-        #    #data, seed = next(dataset)
-        #    indices = get_indices(data[1])
-        #    x = tf.tensor_scatter_nd_update(
-        #        x,
-        #        indices,
-        #        self.model(data[0]))
-        #return x
 
     def get_covariance(self, x):
         """Calculates covariance, mean and difference of mean from summaries
@@ -1038,17 +1046,18 @@ class IMNN:
 
         Parameters
         __________
-        x : TF tensor float (n_s, n_summaries)
+        x : tf.TensorArray([]) (n_s, n_summaries)
             summaries output by the model
 
         Returns
         _______
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of the summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of the summaries
-        μ : TF tensor float (n_summaries,)
+        μ : tf.TensorArray([]) (n_summaries,)
             mean of the summaries
+
         """
         μ = tf.reduce_mean(x, axis=0, keepdims=True)
         ν = tf.subtract(x, μ)
@@ -1068,13 +1077,14 @@ class IMNN:
 
         Parameters
         _________
-        dx_dθ : TF tensor float (n_d, 2, n_params, n_summaries)
+        dx_dθ : tf.TensorArray([]) (n_d, 2, n_params, n_summaries)
             upper and lower parameter value summaries for numerical derivative
 
         Returns
         _______
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of the mean of the summaries with respect to the params
+
         """
         return tf.reduce_mean(
             tf.divide(
@@ -1089,17 +1099,18 @@ class IMNN:
 
         Parameters
         __________
-        Cinv : TF tensor float (n_summaries, n_summaries) or
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries) or
                           (n_summaries + n_external, n_summaries + n_external)
             inverse covariance of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries) or
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries) or
                                 (n_params, n_summaries + n_external)
             derivative mean summaries wrt parameters
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
+
         """
         return tf.einsum(
             "ij,kj->ik",
@@ -1118,15 +1129,16 @@ class IMNN:
 
         Parameters
         __________
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of the summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of the summaries
 
         Returns
         _______
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of the regularisation term
+
         """
         return tf.multiply(
             tf.convert_to_tensor(0.5, dtype=self.dtype),
@@ -1151,13 +1163,14 @@ class IMNN:
 
         Parameters
         __________
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of the regularisation term
 
         Returns
         _______
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             dynamical coupling strength for the regularisation
+
         """
         return tf.divide(
             tf.multiply(self.λ, regularisation),
@@ -1170,17 +1183,18 @@ class IMNN:
 
         Parameters
         __________
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             Frobenium norm of difference between C and I and Cinv and I
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             dynamic regulariser coupling strength determined by regularisation
 
         Returns
         _______
-        Λ : TF tensor float ()
+        Λ : tf.TensorArray([]) ()
             -log(det(F)) + regularisation
+
         """
         return tf.subtract(
             tf.multiply(r, regularisation),
@@ -1191,22 +1205,22 @@ class IMNN:
 
         Parameters
         __________
-        x : TF tensor float (n_s, n_summaries)
+        x : tf.TensorArray([]) (n_s, n_summaries)
             summaries output by the model
-        dx_dθ : TF tensor float (n_d, 2, n_params, n_summaries)
+        dx_dθ : tf.TensorArray([]) (n_d, 2, n_params, n_summaries)
             upper and lower parameter value summaries for numerical derivative
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
 
         Calls
@@ -1217,6 +1231,7 @@ class IMNN:
             calculates the mean of the derivative of the summaries
         get_fisher(tensor)
             calculates Fisher information matrix
+
         """
         C, Cinv, μ = self.get_covariance(x)
         dμ_dθ = self.get_dμ_dθ(dx_dθ)
@@ -1228,20 +1243,20 @@ class IMNN:
 
         Parameters
         __________
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
 
         Returns
         _______
-        Λ : TF tensor float ()
+        Λ : tf.TensorArray([]) ()
             value of the regularised -log(det(F))
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of the regularisation term
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical regularisation coupling strength
 
         Calls
@@ -1252,6 +1267,7 @@ class IMNN:
             calculates the dynamical coupling strength for the regularisation
         get_loss(tensor, tensor, tensor)
             calculates the loss function (-log(det(F)) + regularisation)
+
         """
         regularisation = self.get_regularisation(C, Cinv)
         r = self.get_r(regularisation)
@@ -1272,21 +1288,21 @@ class IMNN:
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        dΛdx : list of TF tensor float (len = 2)
+        dΛdx : list of tf.TensorArray([]) (len = 2)
             list of the gradients with respect to the summaries and derivatives
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of regulariser
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical coupling strength of the regulariser
 
         Calls
@@ -1295,6 +1311,7 @@ class IMNN:
             calculates the statistics necessary for Fisher from the summaries
         calculate_loss(tensor, tensor, tensor)
             calculates the loss function and the regularisation
+
         """
         with tf.GradientTape() as tape:
             tape.watch([x, dx_dθ])
@@ -1326,6 +1343,7 @@ class IMNN:
         _____
         set_dataset(bool, bool)
             returns dataset and index making function for training/validation
+
         """
         dataset, get_indices, loops = self.set_dataset(derivative,
             validate=False)
@@ -1347,25 +1365,9 @@ class IMNN:
                 for variable in range(len(self.model.variables)))
             return (gradient, loop_counter+1)
 
-        #dataset, get_indices = self.set_dataset(derivative, validate=False)
         gradient = tuple(tf.zeros(variable.shape)
                          for variable in self.model.variables)
         return tf.while_loop(cond, body, (gradient, 0))[0]
-
-        #for loop in range(loops):
-        #    data, seed = next(dataset)
-        #for data, seed in dataset:
-        #    indices = get_indices(data[1])
-        #    with tf.GradientTape() as tape:
-        #        x = self.model(data[0])
-        #    batch_gradient = tape.gradient(
-        #        x,
-        #        self.model.variables,
-        #        output_gradients=tf.gather_nd(dΛdx, indices))
-        #    gradient = tuple(
-        #        tf.add(batch_gradient[variable], gradient[variable])
-        #        for variable in range(len(self.model.variables)))
-        #return gradient
 
     @tf.function
     def scatter(self, F, C, Cinv, μ, dμ_dθ, reg=None, r=None, validate=False):
@@ -1391,38 +1393,38 @@ class IMNN:
 
         Parameters
         __________
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
-        reg : TF tensor float ()
+        reg : tf.TensorArray([]) ()
             value of regulariser
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical coupling strength of the regulariser
         validate : bool
             whether the data is validation data or not
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
-        reg : TF tensor float ()
+        reg : tf.TensorArray([]) ()
             value of regulariser
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical coupling strength of the regulariser
 
         Calls
@@ -1435,6 +1437,7 @@ class IMNN:
             calculates the gradient of the loss with respect to the summaries
         get_network_gradient(tensor, bool)
             gets aggregated derivative of the loss with respect to the model
+
         """
         x = self.get_summaries(tf.zeros((self.n_s, self.n_summaries)),
                                derivative=False,
@@ -1467,36 +1470,37 @@ class IMNN:
 
         Parameters
         __________
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
         validate : bool
             whether the data is validation data or not
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
 
         Calls
         _____
         calculate_fisher(tensor, tensor)
             calculates the statistics necessary for Fisher from the summaries
+
         """
         if validate:
             data = self.validation_data
@@ -1534,36 +1538,36 @@ class IMNN:
 
         Parameters
         __________
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of regulariser
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical coupling strength of the regulariser
 
         Returns
         _______
-        F : TF tensor float (n_params, n_params)
+        F : tf.TensorArray([]) (n_params, n_params)
             Fisher information matrix
-        C : TF tensor float (n_summaries, n_summaries)
+        C : tf.TensorArray([]) (n_summaries, n_summaries)
             covariance of summaries
-        Cinv : TF tensor float (n_summaries, n_summaries)
+        Cinv : tf.TensorArray([]) (n_summaries, n_summaries)
             inverse covariance of summaries
-        μ : TF tensor float (n_summaries)
+        μ : tf.TensorArray([]) (n_summaries)
             mean of the summaries
-        dμ_dθ : TF tensor float (n_params, n_summaries)
+        dμ_dθ : tf.TensorArray([]) (n_params, n_summaries)
             derivative of mean summaries with respect to the parameters
-        regularisation : TF tensor float ()
+        regularisation : tf.TensorArray([]) ()
             value of regulariser
-        r : TF tensor float ()
+        r : tf.TensorArray([]) ()
             value of the dynamical coupling strength of the regulariser
 
         Calls
@@ -1572,6 +1576,7 @@ class IMNN:
             calulates the Fisher information matrix from scratch
         calculate_loss(tensor, tensor, tensor)
             calculates the loss function and the regularisation
+
         """
         with tf.GradientTape() as tape:
             F, C, Cinv, μ, dμ_dθ = self.run_fisher(F, C, Cinv, μ, dμ_dθ,
@@ -1590,6 +1595,7 @@ class IMNN:
             coupling strength of the regulariser term when far from identity
         ϵ : float
             closeness parameter describing how far covariance is from identity
+
         """
         self.λ = tf.convert_to_tensor(
             self.u.type_checking(λ, 1., "λ"),
@@ -1617,12 +1623,13 @@ class IMNN:
 
         Parameters
         __________
-        d : TF tensor float (None,) + input_shape
+        d : tf.TensorArray([]) (None,) + input_shape
 
         Returns
         _______
-        estimate : TF tensor float (None, n_params)
+        estimate : tf.TensorArray([]) (None, n_params)
             value of the estimate from the IMNN
+
         """
         self.Finv = tf.linalg.inv(self.F)
         return tf.add(
@@ -1643,6 +1650,7 @@ class IMNN:
         __________
         filename : str
             filename to save the estimator parameters
+
         """
         np.savez(filename, Finv=np.linalg.inv(self.F.numpy()),
             θ_fid=self.θ_fid, dμ_dθ=self.dμ_dθ.numpy(), Cinv=self.Cinv.numpy(),

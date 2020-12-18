@@ -253,46 +253,50 @@ class ApproximateBayesianComputation(LikelihoodFreeInference):
                             for parameters in accepted_parameters]))
         return marginals
 
-    def scatter_plot(self, ax=None, ranges=None, points=None, labels=None,
-                     colours=None, hist=True, s=5, alpha=1., figsize=(10, 10),
-                     linestyle="solid", target=None):
+    def scatter_plot(self, ax=None, ranges=None, points=None, label=None,
+                     axis_labels=None, colours=None, hist=True, s=5, alpha=1.,
+                     figsize=(10, 10), linestyle="solid", target=None, ncol=2,
+                     bbox_to_anchor=(0.0, 1.0)):
         if ranges is None:
             ranges = self.ranges
         if points is None:
             points = self.parameters.accepted
         return self.scatter_plot_(
-            ax=ax, ranges=ranges, points=points, labels=labels,
-            colours=colours, hist=hist, s=s, alpha=alpha, figsize=figsize,
-            linestyle=linestyle, target=target)
+            ax=ax, ranges=ranges, points=points, label=label,
+            axis_labels=axis_labels, colours=colours, hist=hist, s=s,
+            alpha=alpha, figsize=figsize, linestyle=linestyle, target=target,
+            ncol=ncol, bbox_to_anchor=bbox_to_anchor)
 
-    def scatter_summaries(self, ax=None, ranges=None, points=None, labels=None,
-                     colours=None, hist=True, s=5, alpha=1., figsize=(10, 10),
-                     linestyle="solid", gridsize=100, target=None,
-                     format=False):
+    def scatter_summaries(self, ax=None, ranges=None, points=None, label=None,
+                     axis_labels=None, colours=None, hist=True, s=5, alpha=1.,
+                     figsize=(10, 10), linestyle="solid", gridsize=100,
+                     target=None, format=False, ncol=2,
+                     bbox_to_anchor=(0.0, 1.0)):
         if points is None:
             points = self.summaries.accepted
             n_summaries = self.n_summaries
         else:
             n_summaries = points[0].shape[-1]
         gridsize = self.get_gridsize(gridsize, n_summaries)
-        n_targets = self.target_choice(target)
+        targets, n_targets = self.target_choice(target)
         if ranges is None:
             ranges = [
                 np.linspace(
                     np.min(
                         np.array([
                             np.min(self.summaries.accepted[target][:, summary])
-                            for target in n_targets])),
+                            for target in targets])),
                     np.max(
                         np.array([
                             np.max(self.summaries.accepted[target][:, summary])
-                            for target in n_targets])),
+                            for target in targets])),
                     gridsize[summary])
                 for summary in range(n_summaries)]
         return self.scatter_plot_(
-            ax=ax, ranges=ranges, points=points, labels=labels,
-            colours=colours, hist=hist, s=s, alpha=alpha, figsize=figsize,
-            linestyle=linestyle, target=target, format=format)
+            ax=ax, ranges=ranges, points=points, label=label,
+            axis_labels=axis_labels, colours=colours, hist=hist, s=s,
+            alpha=alpha, figsize=figsize, linestyle=linestyle, target=target,
+            format=format, ncol=ncol, bbox_to_anchor=bbox_to_anchor)
 
     def F_distance(self, x, y):
         difference = np.expand_dims(x, 1) - np.expand_dims(y, 0)

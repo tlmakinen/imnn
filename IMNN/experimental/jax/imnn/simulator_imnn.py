@@ -7,14 +7,16 @@ import sys
 import inspect
 from functools import partial
 from IMNN.experimental.jax.imnn import IMNN
+from IMNN.experimental.jax.utils import check_simulator
 from IMNN.experimental.jax.utils import value_and_jacrev
 
 class SimulatorIMNN(IMNN):
-    def __init__(self, n_s, n_d, n_summaries, input_shape, θ_fid, model,
-                 optimiser, key, simulator, verbose=True):
+    def __init__(self, n_s, n_d, n_params, n_summaries, input_shape, θ_fid,
+                 model, optimiser, key, simulator, verbose=True):
         super().__init__(
             n_s=n_s,
             n_d=n_d,
+            n_params=n_params,
             n_summaries=n_summaries,
             input_shape=input_shape,
             θ_fid=θ_fid,
@@ -22,21 +24,8 @@ class SimulatorIMNN(IMNN):
             key=key,
             optimiser=optimiser,
             verbose=verbose)
-        if simulator is None:
-            if self.verbose:
-                print("no `simulator`")
-            sys.exit()
-        elif not callable(simulator):
-            if self.verbose:
-                print("`simulator` not callable")
-            sys.exit()
-        else:
-            if len(inspect.signature(simulator).parameters) != 2:
-                if self.verbose:
-                    print("`simulator` must take two arguments, a JAX prng " +
-                      "and simulator parameters")
-                sys.exit()
-            self.simulator = simulator
+        self.simulator = check_simulator(simulator)
+        self.simulate = True
 
     def get_fitting_keys(self, rng):
         return jax.random.split(rng, num=3)
