@@ -13,7 +13,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/reStructuredText",
     url="https://bitbucket.org/tomcharnock/IMNN.git",
-    packages=["IMNN", "IMNN.LFI", "IMNN.utils", "IMNN.experimental.jax.imnn", "IMNN.experimental.jax.lfi", "IMNN.experimental.jax.utils"],
+    packages=["IMNN", "IMNN.LFI", "IMNN.utils", "IMNN.experimental", "IMNN.experimental.jax", "IMNN.experimental.jax.imnn", "IMNN.experimental.jax.lfi", "IMNN.experimental.jax.utils"],
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: MIT License",
@@ -22,7 +22,7 @@ setuptools.setup(
     python_requires=">=3",
     install_requires=[
           "tensorflow>=2.1.0",
-	  "jax>=0.2.5",
+          "jax>=0.2.5",
           "tqdm>=4.31.0",
           "numpy>=1.16.0",
           "scipy>=1.4.1",

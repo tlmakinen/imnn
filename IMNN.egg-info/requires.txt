@@ -1,0 +1,6 @@
+tensorflow>=2.1.0
+jax>=0.2.5
+tqdm>=4.31.0
+numpy>=1.16.0
+scipy>=1.4.1
+matplotlib
