@@ -212,7 +212,7 @@ class PowerBox(object):
         #mask = np.where(k != 0)
         # Re-use the k array to conserve memory
         #k = jax.ops.index_update(k, jax.ops.index[...], self.pk(k))
-        k = np.where(k != 0, self.pk(k), k)
+        k = np.where(k != 0., self.pk(k), k)
         print("k shape: ", k.shape)
         #k[mask] = self.pk(k[mask])
         return k
@@ -233,9 +233,9 @@ class PowerBox(object):
         "The realised field in real-space from the input power spectrum"
         # Here we multiply by V because the (inverse) fourier-transform of the (dimensionless) power has
         # units of 1/V and we require a unitless quantity for delta_x.
-        dk = np.empty((self.N,) * self.dim)#, dtype='complex128')
-        #dk = jax.ops.index_update(dk, jax.ops.index[...], self.delta_k())
-        dk = self.delta_k()
+        dk = np.empty((self.N,) * self.dim, dtype='complex128')
+        dk = jax.ops.index_update(dk, jax.ops.index[...], self.delta_k())
+        #dk = self.delta_k()
         #dk[...] = self.delta_k()
         dk = jax.ops.index_update(dk, jax.ops.index[...],self.V * dft.ifft(dk, L=self.boxlength, a=self.fourier_a, b=self.fourier_b)[0])
         #dk[...] = self.V * dft.ifft(dk, L=self.boxlength, a=self.fourier_a, b=self.fourier_b)[0]
